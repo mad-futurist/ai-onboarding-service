@@ -9,6 +9,7 @@ class OnboardingTaskCreate(BaseModel):
     day_number: int | None = None
     task_type: str = "general"
     priority: str = "medium"
+    success_criteria: str | None = None
 
 
 class OnboardingTaskRead(BaseModel):
@@ -21,6 +22,7 @@ class OnboardingTaskRead(BaseModel):
     task_type: str
     status: str
     priority: str
+    success_criteria: str | None
     created_at: datetime
     updated_at: datetime
 

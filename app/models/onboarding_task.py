@@ -21,6 +21,8 @@ class OnboardingTask(Base):
     status = Column(String(50), nullable=False, default="todo")
     priority = Column(String(50), nullable=False, default="medium")
 
+    success_criteria = Column(Text, nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
         DateTime(timezone=True),

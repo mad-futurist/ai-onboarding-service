@@ -72,6 +72,7 @@ def create_onboarding_plan_with_tasks(
             day_number=task_payload.day_number,
             task_type=task_payload.task_type,
             priority=task_payload.priority,
+            success_criteria=task_payload.success_criteria,
             status="todo",
         )
         db.add(task)

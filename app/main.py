@@ -1,9 +1,9 @@
 from fastapi import FastAPI
 
 from app.core.config import settings
-from app.api.routes import documents
 from app.api.routes import users
 from app.api.routes import newcomers
+from app.api.routes import documents
 from app.api.routes import onboarding_plans
 from app.api.routes import tasks
 
