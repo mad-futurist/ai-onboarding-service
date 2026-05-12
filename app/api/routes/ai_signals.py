@@ -15,10 +15,30 @@ from app.services.ai_signal_service import (
     ignore_signal,
     resolve_signal,
 )
+from app.services.feature_service import compute_newcomer_features
 
 
 router = APIRouter(prefix="/ai-signals", tags=["AI Signals"])
 
+@router.get("/features/newcomers/{newcomer_id}")
+def get_newcomer_signal_features(
+    newcomer_id: int,
+    db: Session = Depends(get_db),
+):
+    newcomer = (
+        db.query(NewcomerProfile)
+        .filter(NewcomerProfile.id == newcomer_id)
+        .first()
+    )
+
+    if not newcomer:
+        raise HTTPException(status_code=404, detail="Newcomer not found")
+
+    return compute_newcomer_features(
+        db=db,
+        newcomer_id=newcomer_id,
+        days=7,
+    )
 
 @router.post("/", response_model=AISignalRead)
 def create_ai_signal(

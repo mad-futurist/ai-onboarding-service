@@ -7,6 +7,9 @@ from app.models.ai_signal import AISignal
 from app.models.newcomer import NewcomerProfile
 from app.models.onboarding_plan import OnboardingPlan
 from app.models.onboarding_task import OnboardingTask
+from app.services.feature_service import compute_newcomer_features
+from app.services.signal_scoring_service import score_all_signals
+from app.services.signal_upsert_service import upsert_signal
 
 
 DEPLOYMENT_KEYWORDS = [
@@ -394,7 +397,7 @@ def detect_repeated_source_friction(
 def detect_signals_for_newcomer(
     db: Session,
     newcomer_id: int,
-) -> list[AISignal]:
+) -> tuple[list[AISignal], int, int]:
     newcomer = (
         db.query(NewcomerProfile)
         .filter(NewcomerProfile.id == newcomer_id)
@@ -404,31 +407,38 @@ def detect_signals_for_newcomer(
     if not newcomer:
         raise ValueError("Newcomer not found")
 
-    questions = get_newcomer_questions(db, newcomer_id)
-    tasks = get_newcomer_tasks(db, newcomer_id)
+    features = compute_newcomer_features(
+        db=db,
+        newcomer_id=newcomer_id,
+        days=7,
+    )
 
-    created_signals: list[AISignal] = []
+    score_results = score_all_signals(features)
 
-    detectors = [
-        lambda: detect_deployment_confusion(db, newcomer_id, questions, tasks),
-        lambda: detect_hr_friction(db, newcomer_id, questions),
-        lambda: detect_access_friction(db, newcomer_id, questions),
-        lambda: detect_blocked_tasks(db, newcomer_id, tasks),
-        lambda: detect_repeated_source_friction(db, newcomer_id, questions),
-    ]
+    signals: list[AISignal] = []
+    created_count = 0
+    updated_count = 0
 
-    for detector in detectors:
-        signal = detector()
+    for score_result in score_results:
+        signal, created = upsert_signal(
+            db=db,
+            newcomer_id=newcomer_id,
+            score_result=score_result,
+        )
 
-        if signal:
-            created_signals.append(signal)
+        signals.append(signal)
+
+        if created:
+            created_count += 1
+        else:
+            updated_count += 1
 
     db.commit()
 
-    for signal in created_signals:
+    for signal in signals:
         db.refresh(signal)
 
-    return created_signals
+    return signals, created_count, updated_count
 
 
 def resolve_signal(
