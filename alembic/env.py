@@ -28,6 +28,7 @@ from app.models.onboarding_plan import OnboardingPlan
 from app.models.onboarding_task import OnboardingTask
 from app.models.ai_question import AIQuestion, AIQuestionSource
 from app.models.ai_signal import AISignal
+from app.models.onboarding_event import OnboardingEvent
 
 target_metadata = Base.metadata
 # other values from the config, defined by the needs of env.py,

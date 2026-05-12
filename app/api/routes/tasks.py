@@ -11,6 +11,9 @@ from app.schemas.onboarding_plan import (
     OnboardingPlanRead,
     OnboardingPlanWithTasksRead,
 )
+from app.schemas.onboarding_task import OnboardingTaskRead, OnboardingTaskStatusUpdate
+from app.services.event_logger import log_onboarding_event
+from app.services.topic_classifier import classify_topic
 
 
 router = APIRouter(prefix="/onboarding-plans", tags=["Onboarding Plans"])
@@ -107,3 +110,51 @@ def approve_onboarding_plan(plan_id: int, db: Session = Depends(get_db)):
     db.refresh(plan)
 
     return plan
+
+@router.patch("/{task_id}/status", response_model=OnboardingTaskRead)
+def update_task_status(
+    task_id: int,
+    payload: OnboardingTaskStatusUpdate,
+    db: Session = Depends(get_db),
+):
+    task = db.query(OnboardingTask).filter(OnboardingTask.id == task_id).first()
+
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    allowed_statuses = ["todo", "in_progress", "done", "blocked"]
+
+    if payload.status not in allowed_statuses:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid status. Allowed values: {allowed_statuses}",
+        )
+
+    old_status = task.status
+    task.status = payload.status
+
+    topic = classify_topic(
+        f"{task.title} {task.description or ''} {task.task_type}"
+    )
+
+    if task.plan and task.plan.newcomer_id:
+        log_onboarding_event(
+            db=db,
+            newcomer_id=task.plan.newcomer_id,
+            user_id=None,
+            event_type="task_status_changed",
+            entity_type="onboarding_task",
+            entity_id=task.id,
+            topic=topic,
+            metadata_json={
+                "task_id": task.id,
+                "task_title": task.title,
+                "old_status": old_status,
+                "new_status": payload.status,
+            },
+        )
+
+    db.commit()
+    db.refresh(task)
+
+    return task

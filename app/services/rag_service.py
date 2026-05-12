@@ -9,6 +9,8 @@ from app.models.document_chunk import DocumentChunk
 from app.models.ai_question import AIQuestion, AIQuestionSource
 from app.services.chunking_service import split_text_into_chunks, estimate_tokens
 from app.services.embedding_service import create_embedding
+from app.services.event_logger import log_onboarding_event
+from app.services.topic_classifier import classify_topic
 
 
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
@@ -212,6 +214,27 @@ def ask_ai_with_sources(
         )
 
         db.add(source)
+
+    db.commit()
+    db.refresh(ai_question)
+
+    if newcomer_id:
+        topic = classify_topic(question)
+
+        log_onboarding_event(
+            db=db,
+            newcomer_id=newcomer_id,
+            user_id=user_id,
+            event_type="ai_question_asked",
+            entity_type="ai_question",
+            entity_id=ai_question.id,
+            topic=topic,
+            metadata_json={
+                "question": question,
+                "source_titles": [source.title for source in ai_question.sources],
+                "top_k": top_k,
+            },
+        )
 
     db.commit()
     db.refresh(ai_question)
