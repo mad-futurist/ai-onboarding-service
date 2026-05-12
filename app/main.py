@@ -7,6 +7,7 @@ from app.api.routes import documents
 from app.api.routes import onboarding_plans
 from app.api.routes import tasks
 from app.api.routes import ai
+from app.api.routes import ai_signals
 
 
 app = FastAPI(title=settings.APP_NAME)
@@ -27,3 +28,4 @@ app.include_router(documents.router)
 app.include_router(onboarding_plans.router)
 app.include_router(tasks.router)
 app.include_router(ai.router)
+app.include_router(ai_signals.router)

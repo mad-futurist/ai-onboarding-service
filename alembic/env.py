@@ -23,8 +23,11 @@ from app.db.base import Base
 from app.models.user import User
 from app.models.newcomer import NewcomerProfile
 from app.models.document import Document
+from app.models.document_chunk import DocumentChunk
 from app.models.onboarding_plan import OnboardingPlan
 from app.models.onboarding_task import OnboardingTask
+from app.models.ai_question import AIQuestion, AIQuestionSource
+from app.models.ai_signal import AISignal
 
 target_metadata = Base.metadata
 # other values from the config, defined by the needs of env.py,
