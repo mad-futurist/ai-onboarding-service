@@ -7,7 +7,7 @@ from pydantic import ValidationError
 from app.core.config import settings
 from app.models.document import Document
 from app.models.newcomer import NewcomerProfile
-from app.schemas.ai_plan import AIPlanOutput, AIPlanTaskOutput
+from app.schemas.ai_plan import AIPlanOutput, AIPlanTaskOutput, AIPlanServiceResult
 
 
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
@@ -186,7 +186,7 @@ def generate_onboarding_plan_with_ai(
     newcomer: NewcomerProfile,
     documents: list[Document],
     mentor_notes: str | None = None,
-) -> AIPlanOutput:
+) -> AIPlanServiceResult:
     system_prompt = load_prompt_template()
     newcomer_context = build_newcomer_context(newcomer)
     documents_context = build_documents_context(documents)
@@ -252,7 +252,10 @@ Make the plan useful for a mentor dashboard and a newcomer dashboard.
         parsed = json.loads(raw_output)
         plan = AIPlanOutput.model_validate(parsed)
 
-        return normalize_ai_plan(plan)
+        return AIPlanServiceResult(plan=normalize_ai_plan(plan), used_fallback=False)
 
     except (ValidationError, json.JSONDecodeError, Exception):
-        return build_fallback_plan(newcomer)
+        return  AIPlanServiceResult(
+                    plan=build_fallback_plan(newcomer),
+                    used_fallback=True,
+                )

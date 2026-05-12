@@ -37,3 +37,8 @@ class AIPlanGenerationResponse(BaseModel):
     generated_by_ai: bool
     mentor_approved: bool
     tasks_count: int
+    used_fallback: bool
+
+class AIPlanServiceResult(BaseModel):
+    plan: AIPlanOutput
+    used_fallback: bool = False

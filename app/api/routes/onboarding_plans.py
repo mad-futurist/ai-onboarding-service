@@ -51,11 +51,13 @@ def generate_onboarding_plan(
                 detail=f"Documents not found: {sorted(missing_document_ids)}",
             )
 
-    ai_plan = generate_onboarding_plan_with_ai(
-        newcomer=newcomer,
-        documents=documents,
-        mentor_notes=payload.mentor_notes,
-    )
+    ai_result = generate_onboarding_plan_with_ai(
+                                        newcomer=newcomer,
+                                        documents=documents,
+                                        mentor_notes=payload.mentor_notes,
+                                        )
+
+    ai_plan = ai_result.plan
 
     plan = OnboardingPlan(
         newcomer_id=newcomer.id,
@@ -99,6 +101,8 @@ def generate_onboarding_plan(
     db.commit()
     db.refresh(plan)
 
+    used_fallback=ai_result.used_fallback
+
     return AIPlanGenerationResponse(
         plan_id=plan.id,
         title=plan.title,
@@ -106,6 +110,7 @@ def generate_onboarding_plan(
         generated_by_ai=plan.generated_by_ai,
         mentor_approved=plan.mentor_approved,
         tasks_count=len(ai_plan.tasks),
+        used_fallback=used_fallback,
     )
 
 @router.post("/", response_model=OnboardingPlanRead)
