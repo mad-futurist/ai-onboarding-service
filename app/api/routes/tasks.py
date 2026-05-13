@@ -4,13 +4,28 @@ from sqlalchemy.orm import Session, joinedload
 from app.db.session import get_db
 from app.models.onboarding_plan import OnboardingPlan
 from app.models.onboarding_task import OnboardingTask
+from app.schemas.document import DocumentListItem
+from app.schemas.ai_question import AIQuestionRead
 from app.schemas.onboarding_task import (
     OnboardingTaskCreate,
     OnboardingTaskRead,
     OnboardingTaskStatusUpdate,
 )
 from app.services.event_logger import log_onboarding_event
+from app.services.task_detail_service import get_task_detail
 from app.services.topic_classifier import classify_topic
+from pydantic import BaseModel
+from typing import Any
+
+
+class TaskDetailResponse(BaseModel):
+    task: OnboardingTaskRead
+    why_it_matters: str | None
+    related_documents: list[DocumentListItem]
+    related_ai_questions: list[AIQuestionRead]
+    people_to_ask: list[Any]
+    suggested_prompt: str | None
+    blocked_report_status: str | None
 
 
 router = APIRouter(prefix="/tasks", tags=["Tasks"])
@@ -66,6 +81,23 @@ def list_tasks_for_plan(
         )
         .all()
     )
+
+
+@router.get("/{task_id}/detail")
+def get_task_detail_view(task_id: int, db: Session = Depends(get_db)):
+    detail = get_task_detail(db=db, task_id=task_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Task not found")
+    from app.schemas.person_contact import PersonContactRead
+    return {
+        "task": detail["task"],
+        "why_it_matters": detail["why_it_matters"],
+        "related_documents": detail["related_documents"],
+        "related_ai_questions": detail["related_ai_questions"],
+        "people_to_ask": detail["people_to_ask"],
+        "suggested_prompt": detail["suggested_prompt"],
+        "blocked_report_status": detail["blocked_report_status"],
+    }
 
 
 @router.get("/{task_id}", response_model=OnboardingTaskRead)

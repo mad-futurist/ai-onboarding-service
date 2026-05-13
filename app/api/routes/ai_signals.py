@@ -4,12 +4,14 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.ai_signal import AISignal
 from app.models.newcomer import NewcomerProfile
+from app.models.ai_signal_feedback import AISignalFeedback
 from app.schemas.ai_signal import (
     AISignalCreate,
     AISignalDetectionResponse,
     AISignalRead,
     AISignalStatusUpdateResponse,
 )
+from app.schemas.ai_signal_feedback import AISignalFeedbackCreate, AISignalFeedbackRead
 from app.services.ai_signal_service import (
     detect_signals_for_newcomer,
     ignore_signal,
@@ -170,3 +172,30 @@ def ignore_ai_signal(
         raise HTTPException(status_code=404, detail="AI signal not found")
 
     return signal
+
+
+@router.post("/{signal_id}/feedback", response_model=AISignalFeedbackRead, status_code=201)
+def create_signal_feedback(
+    signal_id: int,
+    payload: AISignalFeedbackCreate,
+    db: Session = Depends(get_db),
+):
+    signal = db.query(AISignal).filter(AISignal.id == signal_id).first()
+    if not signal:
+        raise HTTPException(status_code=404, detail="AI signal not found")
+
+    feedback = AISignalFeedback(
+        signal_id=signal_id,
+        user_id=payload.user_id,
+        feedback_type=payload.feedback_type,
+        comment=payload.comment,
+    )
+    db.add(feedback)
+    db.commit()
+    db.refresh(feedback)
+    return feedback
+
+
+@router.get("/feedback/", response_model=list[AISignalFeedbackRead])
+def list_signal_feedbacks(db: Session = Depends(get_db)):
+    return db.query(AISignalFeedback).order_by(AISignalFeedback.id.desc()).all()

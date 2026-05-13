@@ -9,6 +9,9 @@ class DocumentCreate(BaseModel):
     content: str
     source: str | None = None
     document_type: str | None = None
+    domain: str | None = None
+    role_target: str | None = None
+    scope: str | None = None
 
 
 class DocumentUpdate(BaseModel):
@@ -16,6 +19,9 @@ class DocumentUpdate(BaseModel):
     content: str | None = None
     source: str | None = None
     document_type: str | None = None
+    domain: str | None = None
+    role_target: str | None = None
+    scope: str | None = None
 
 
 class DocumentRead(BaseModel):
@@ -24,6 +30,9 @@ class DocumentRead(BaseModel):
     content: str
     source: str | None
     document_type: str | None
+    domain: str | None
+    role_target: str | None
+    scope: str | None
     created_at: datetime
 
     class Config:
@@ -35,6 +44,9 @@ class DocumentListItem(BaseModel):
     title: str
     source: str | None
     document_type: str | None
+    domain: str | None
+    role_target: str | None
+    scope: str | None
     created_at: datetime
 
     class Config:
@@ -43,3 +55,14 @@ class DocumentListItem(BaseModel):
 
 class DocumentWithChunksRead(DocumentRead):
     chunks: list[DocumentChunkRead] = []
+
+
+class KnowledgeBaseGroupItem(BaseModel):
+    domain: str | None
+    scope: str | None
+    documents: list[DocumentListItem]
+
+
+class KnowledgeBaseResponse(BaseModel):
+    total: int
+    groups: list[KnowledgeBaseGroupItem]

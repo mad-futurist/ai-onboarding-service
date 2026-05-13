@@ -30,6 +30,14 @@ from app.models.ai_question import AIQuestion, AIQuestionSource
 from app.models.ai_signal import AISignal
 from app.models.onboarding_event import OnboardingEvent
 from app.models.plan_adjustment import PlanAdjustmentSuggestion
+from app.models.blocked_report import BlockedReport
+from app.models.person_contact import PersonContact, NewcomerRecommendedContact
+from app.models.company_onboarding_gap import CompanyOnboardingGap
+from app.models.mentor_digest import MentorDigest
+from app.models.ai_answer_feedback import AIAnswerFeedback
+from app.models.ai_signal_feedback import AISignalFeedback
+from app.models.progress_snapshot import ProgressSnapshot
+from app.models.onboarding_reflection import OnboardingReflection
 
 target_metadata = Base.metadata
 # other values from the config, defined by the needs of env.py,

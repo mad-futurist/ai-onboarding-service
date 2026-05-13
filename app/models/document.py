@@ -13,6 +13,10 @@ class Document(Base):
     source = Column(String(255), nullable=True)
     document_type = Column(String(100), nullable=True)
 
+    domain = Column(String(100), nullable=True)        # technical | hr | process | architecture | other
+    role_target = Column(String(255), nullable=True)   # backend_developer | qa | all | etc.
+    scope = Column(String(50), nullable=True)          # enterprise | team | role
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     chunks = relationship(
