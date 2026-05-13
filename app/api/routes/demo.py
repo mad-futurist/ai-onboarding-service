@@ -1,0 +1,26 @@
+from fastapi import APIRouter, Depends
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+from app.db.session import get_db
+from app.services.demo_seed_service import seed_demo_data
+
+router = APIRouter(prefix="/demo", tags=["Demo"])
+
+
+class SeedResponse(BaseModel):
+    mentor_id: int | None = None
+    newcomer_id: int | None = None
+    newcomer_user_id: int | None = None
+    plan_id: int | None = None
+    signal_id: int | None = None
+    documents_created: int | None = None
+    tasks_created: int | None = None
+    questions_created: int | None = None
+    already_seeded: bool = False
+
+
+@router.post("/seed", response_model=SeedResponse)
+def seed(db: Session = Depends(get_db)):
+    result = seed_demo_data(db=db)
+    return SeedResponse(**result)

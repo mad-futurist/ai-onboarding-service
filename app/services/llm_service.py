@@ -5,7 +5,7 @@ from app.core.config import settings
 
 
 http_client = httpx.Client(verify=False)
-client = OpenAI(http_client=http_client, api_key=settings.OPENAI_API_KEY, verify=False)
+client = OpenAI(http_client=http_client, api_key=settings.OPENAI_API_KEY)
 
 
 

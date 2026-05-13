@@ -2,8 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 
 from app.db.session import get_db
+from app.models.ai_answer_feedback import AIAnswerFeedback
 from app.models.document import Document
 from app.models.ai_question import AIQuestion
+from app.models.newcomer import NewcomerProfile
+from app.schemas.ai_answer_feedback import AIAnswerFeedbackCreate, AIAnswerFeedbackRead
 from app.schemas.ai_question import (
     AIAskRequest,
     AIAskResponse,
@@ -11,6 +14,7 @@ from app.schemas.ai_question import (
     AISourceRead,
 )
 from app.schemas.document_chunk import DocumentChunkGenerateResponse
+from app.services.ai_answer_feedback_service import create_feedback
 from app.services.rag_service import generate_chunks_for_document, ask_ai_with_sources
 
 
@@ -103,3 +107,42 @@ def get_ai_question(
         raise HTTPException(status_code=404, detail="AI question not found")
 
     return ai_question
+
+
+@router.post("/questions/{question_id}/feedback", response_model=AIAnswerFeedbackRead, status_code=201)
+def submit_answer_feedback(
+    question_id: int,
+    payload: AIAnswerFeedbackCreate,
+    db: Session = Depends(get_db),
+):
+    question = db.query(AIQuestion).filter(AIQuestion.id == question_id).first()
+    if not question:
+        raise HTTPException(status_code=404, detail="AI question not found")
+
+    return create_feedback(
+        db=db,
+        question_id=question_id,
+        feedback_type=payload.feedback_type,
+        user_id=payload.user_id,
+        newcomer_id=payload.newcomer_id,
+        rating=payload.rating,
+        comment=payload.comment,
+    )
+
+
+@router.get("/feedback/", response_model=list[AIAnswerFeedbackRead])
+def list_answer_feedbacks(db: Session = Depends(get_db)):
+    return db.query(AIAnswerFeedback).order_by(AIAnswerFeedback.id.desc()).all()
+
+
+@router.get("/feedback/newcomers/{newcomer_id}", response_model=list[AIAnswerFeedbackRead])
+def list_answer_feedbacks_for_newcomer(newcomer_id: int, db: Session = Depends(get_db)):
+    newcomer = db.query(NewcomerProfile).filter(NewcomerProfile.id == newcomer_id).first()
+    if not newcomer:
+        raise HTTPException(status_code=404, detail="Newcomer not found")
+    return (
+        db.query(AIAnswerFeedback)
+        .filter(AIAnswerFeedback.newcomer_id == newcomer_id)
+        .order_by(AIAnswerFeedback.id.desc())
+        .all()
+    )
