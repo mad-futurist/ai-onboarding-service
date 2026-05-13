@@ -5,12 +5,12 @@ from app.db.session import get_db
 from app.models.document import Document
 from app.models.ai_question import AIQuestion
 from app.schemas.ai_question import (
-    DocumentChunkGenerateResponse,
     AIAskRequest,
     AIAskResponse,
     AIQuestionRead,
     AISourceRead,
 )
+from app.schemas.document_chunk import DocumentChunkGenerateResponse
 from app.services.rag_service import generate_chunks_for_document, ask_ai_with_sources
 
 

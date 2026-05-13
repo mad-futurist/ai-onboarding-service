@@ -10,6 +10,8 @@ from app.schemas.document import (
     DocumentListItem,
     DocumentWithChunksRead,
 )
+from app.models.document_chunk import DocumentChunk
+from app.schemas.document_chunk import DocumentChunkListItem
 
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
@@ -104,3 +106,20 @@ def delete_document(document_id: int, db: Session = Depends(get_db)):
         "detail": "Document deleted successfully",
         "document_id": document_id,
     }
+
+@router.get("/{document_id}/chunks", response_model=list[DocumentChunkListItem])
+def list_document_chunks(
+    document_id: int,
+    db: Session = Depends(get_db),
+):
+    document = db.query(Document).filter(Document.id == document_id).first()
+
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    return (
+        db.query(DocumentChunk)
+        .filter(DocumentChunk.document_id == document_id)
+        .order_by(DocumentChunk.chunk_index.asc())
+        .all()
+    )

@@ -2,11 +2,6 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 
-class DocumentChunkGenerateResponse(BaseModel):
-    document_id: int
-    chunks_created: int
-
-
 class AIAskRequest(BaseModel):
     question: str = Field(min_length=3)
     user_id: int | None = None

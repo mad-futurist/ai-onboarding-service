@@ -33,9 +33,3 @@ class DocumentChunkListItem(BaseModel):
 class DocumentChunkGenerateResponse(BaseModel):
     document_id: int
     chunks_created: int
-
-
-class DocumentChunkRegenerateResponse(BaseModel):
-    document_id: int
-    chunks_deleted: int
-    chunks_created: int

@@ -1,115 +1,85 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.db.session import get_db
-from app.models.newcomer import NewcomerProfile
 from app.models.onboarding_plan import OnboardingPlan
 from app.models.onboarding_task import OnboardingTask
-from app.schemas.onboarding_plan import (
-    OnboardingPlanCreate,
-    OnboardingPlanCreateWithTasks,
-    OnboardingPlanRead,
-    OnboardingPlanWithTasksRead,
+from app.schemas.onboarding_task import (
+    OnboardingTaskCreate,
+    OnboardingTaskRead,
+    OnboardingTaskStatusUpdate,
 )
-from app.schemas.onboarding_task import OnboardingTaskRead, OnboardingTaskStatusUpdate
 from app.services.event_logger import log_onboarding_event
 from app.services.topic_classifier import classify_topic
 
 
-router = APIRouter(prefix="/onboarding-plans", tags=["Onboarding Plans"])
+router = APIRouter(prefix="/tasks", tags=["Tasks"])
 
 
-@router.post("/", response_model=OnboardingPlanRead)
-def create_onboarding_plan(payload: OnboardingPlanCreate, db: Session = Depends(get_db)):
-    newcomer = db.query(NewcomerProfile).filter(NewcomerProfile.id == payload.newcomer_id).first()
-
-    if not newcomer:
-        raise HTTPException(status_code=404, detail="Newcomer not found")
-
-    plan = OnboardingPlan(
-        newcomer_id=payload.newcomer_id,
-        mentor_id=payload.mentor_id,
-        title=payload.title,
-        description=payload.description,
-        status="draft",
-        generated_by_ai=False,
-        mentor_approved=False,
-    )
-
-    db.add(plan)
-    db.commit()
-    db.refresh(plan)
-
-    return plan
-
-
-@router.post("/with-tasks", response_model=OnboardingPlanWithTasksRead)
-def create_onboarding_plan_with_tasks(
-    payload: OnboardingPlanCreateWithTasks,
+@router.post("/plans/{plan_id}", response_model=OnboardingTaskRead)
+def create_task_for_plan(
+    plan_id: int,
+    payload: OnboardingTaskCreate,
     db: Session = Depends(get_db),
 ):
-    newcomer = db.query(NewcomerProfile).filter(NewcomerProfile.id == payload.newcomer_id).first()
+    plan = db.query(OnboardingPlan).filter(OnboardingPlan.id == plan_id).first()
 
-    if not newcomer:
-        raise HTTPException(status_code=404, detail="Newcomer not found")
+    if not plan:
+        raise HTTPException(status_code=404, detail="Onboarding plan not found")
 
-    plan = OnboardingPlan(
-        newcomer_id=payload.newcomer_id,
-        mentor_id=payload.mentor_id,
+    task = OnboardingTask(
+        plan_id=plan_id,
         title=payload.title,
         description=payload.description,
-        status="draft",
-        generated_by_ai=False,
-        mentor_approved=False,
+        week_number=payload.week_number,
+        day_number=payload.day_number,
+        task_type=payload.task_type,
+        priority=payload.priority,
+        success_criteria=payload.success_criteria,
+        status="todo",
     )
 
-    db.add(plan)
-    db.flush()
+    db.add(task)
+    db.commit()
+    db.refresh(task)
 
-    for task_payload in payload.tasks:
-        task = OnboardingTask(
-            plan_id=plan.id,
-            title=task_payload.title,
-            description=task_payload.description,
-            week_number=task_payload.week_number,
-            day_number=task_payload.day_number,
-            task_type=task_payload.task_type,
-            priority=task_payload.priority,
-            success_criteria=task_payload.success_criteria,
-            status="todo",
+    return task
+
+
+@router.get("/plans/{plan_id}", response_model=list[OnboardingTaskRead])
+def list_tasks_for_plan(
+    plan_id: int,
+    db: Session = Depends(get_db),
+):
+    plan = db.query(OnboardingPlan).filter(OnboardingPlan.id == plan_id).first()
+
+    if not plan:
+        raise HTTPException(status_code=404, detail="Onboarding plan not found")
+
+    return (
+        db.query(OnboardingTask)
+        .filter(OnboardingTask.plan_id == plan_id)
+        .order_by(
+            OnboardingTask.week_number.asc().nulls_last(),
+            OnboardingTask.day_number.asc().nulls_last(),
+            OnboardingTask.id.asc(),
         )
-        db.add(task)
-
-    db.commit()
-    db.refresh(plan)
-
-    return plan
+        .all()
+    )
 
 
-@router.get("/{plan_id}", response_model=OnboardingPlanWithTasksRead)
-def get_onboarding_plan(plan_id: int, db: Session = Depends(get_db)):
-    plan = db.query(OnboardingPlan).filter(OnboardingPlan.id == plan_id).first()
+@router.get("/{task_id}", response_model=OnboardingTaskRead)
+def get_task(
+    task_id: int,
+    db: Session = Depends(get_db),
+):
+    task = db.query(OnboardingTask).filter(OnboardingTask.id == task_id).first()
 
-    if not plan:
-        raise HTTPException(status_code=404, detail="Onboarding plan not found")
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
 
-    return plan
+    return task
 
-
-@router.patch("/{plan_id}/approve", response_model=OnboardingPlanRead)
-def approve_onboarding_plan(plan_id: int, db: Session = Depends(get_db)):
-    plan = db.query(OnboardingPlan).filter(OnboardingPlan.id == plan_id).first()
-
-    if not plan:
-        raise HTTPException(status_code=404, detail="Onboarding plan not found")
-
-    plan.status = "approved"
-    plan.mentor_approved = True
-
-    db.commit()
-    db.refresh(plan)
-
-    return plan
 
 @router.patch("/{task_id}/status", response_model=OnboardingTaskRead)
 def update_task_status(
@@ -117,7 +87,12 @@ def update_task_status(
     payload: OnboardingTaskStatusUpdate,
     db: Session = Depends(get_db),
 ):
-    task = db.query(OnboardingTask).filter(OnboardingTask.id == task_id).first()
+    task = (
+        db.query(OnboardingTask)
+        .options(joinedload(OnboardingTask.plan))
+        .filter(OnboardingTask.id == task_id)
+        .first()
+    )
 
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -158,3 +133,22 @@ def update_task_status(
     db.refresh(task)
 
     return task
+
+
+@router.delete("/{task_id}")
+def delete_task(
+    task_id: int,
+    db: Session = Depends(get_db),
+):
+    task = db.query(OnboardingTask).filter(OnboardingTask.id == task_id).first()
+
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    db.delete(task)
+    db.commit()
+
+    return {
+        "detail": "Task deleted successfully",
+        "task_id": task_id,
+    }

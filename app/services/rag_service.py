@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+import httpx
 from openai import OpenAI
 from sqlalchemy.orm import Session
 
@@ -13,7 +14,9 @@ from app.services.event_logger import log_onboarding_event
 from app.services.topic_classifier import classify_topic
 
 
-client = OpenAI(api_key=settings.OPENAI_API_KEY)
+http_client = httpx.Client(verify=False)
+client = OpenAI(http_client=http_client, api_key=settings.OPENAI_API_KEY)
+
 
 
 @dataclass

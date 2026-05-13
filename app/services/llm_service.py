@@ -1,9 +1,12 @@
+import httpx
 from openai import OpenAI
 
 from app.core.config import settings
 
 
-client = OpenAI(api_key=settings.OPENAI_API_KEY)
+http_client = httpx.Client(verify=False)
+client = OpenAI(http_client=http_client, api_key=settings.OPENAI_API_KEY, verify=False)
+
 
 
 def generate_answer(prompt: str) -> str:

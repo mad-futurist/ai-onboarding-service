@@ -1,4 +1,5 @@
 import json
+import httpx
 from pathlib import Path
 
 from openai import OpenAI
@@ -9,8 +10,9 @@ from app.models.document import Document
 from app.models.newcomer import NewcomerProfile
 from app.schemas.ai_plan import AIPlanOutput, AIPlanTaskOutput, AIPlanServiceResult
 
+http_client = httpx.Client(verify=False)
+client = OpenAI(http_client=http_client, api_key=settings.OPENAI_API_KEY)
 
-client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
 
 ALLOWED_TASK_TYPES = {

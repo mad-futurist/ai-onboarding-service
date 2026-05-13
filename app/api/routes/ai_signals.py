@@ -118,7 +118,7 @@ def detect_newcomer_signals(
     db: Session = Depends(get_db),
 ):
     try:
-        signals = detect_signals_for_newcomer(
+        signals, created_count, updated_count = detect_signals_for_newcomer(
             db=db,
             newcomer_id=newcomer_id,
         )
@@ -127,7 +127,8 @@ def detect_newcomer_signals(
 
     return AISignalDetectionResponse(
         newcomer_id=newcomer_id,
-        created_count=len(signals),
+        created_count=created_count,
+        updated_count=updated_count,
         signals=signals,
     )
 
