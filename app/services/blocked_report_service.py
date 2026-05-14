@@ -4,8 +4,10 @@ from sqlalchemy.orm import Session
 
 from app.models.blocked_report import BlockedReport
 from app.models.newcomer import NewcomerProfile
+from app.models.onboarding_task import OnboardingTask
 from app.services.event_logger import log_onboarding_event
 from app.services.llm_service import generate_answer
+from app.services.topic_classifier import classify_topic
 
 
 def _build_suggestion_prompt(blocker_type: str, details: str | None) -> str:
@@ -45,6 +47,32 @@ def create_blocked_report(
 
     db.add(report)
     db.flush()
+
+    if task_id:
+        task = db.query(OnboardingTask).filter(OnboardingTask.id == task_id).first()
+        if task and task.status != "done":
+            old_status = task.status
+            task.status = "blocked"
+
+            topic = classify_topic(
+                f"{task.title} {task.description or ''} {task.task_type}"
+            )
+            log_onboarding_event(
+                db=db,
+                newcomer_id=newcomer_id,
+                user_id=user_id,
+                event_type="task_status_changed",
+                entity_type="onboarding_task",
+                entity_id=task.id,
+                topic=topic,
+                metadata_json={
+                    "task_id": task.id,
+                    "task_title": task.title,
+                    "old_status": old_status,
+                    "new_status": "blocked",
+                    "source": "blocked_report",
+                },
+            )
 
     log_onboarding_event(
         db=db,

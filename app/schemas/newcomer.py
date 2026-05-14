@@ -16,6 +16,8 @@ class NewcomerRead(BaseModel):
     id: int
     user_id: int
     mentor_id: int | None
+    full_name: str | None = None
+    email: EmailStr | None = None
     job_title: str
     seniority: str
     team: str

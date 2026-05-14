@@ -4,6 +4,8 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.blocked_report import BlockedReport
 from app.models.newcomer import NewcomerProfile
+from app.models.onboarding_plan import OnboardingPlan
+from app.models.onboarding_task import OnboardingTask
 from app.schemas.blocked_report import (
     BlockedReportCreate,
     BlockedReportRead,
@@ -23,6 +25,19 @@ def report_blocked(payload: BlockedReportCreate, db: Session = Depends(get_db)):
     newcomer = db.query(NewcomerProfile).filter(NewcomerProfile.id == payload.newcomer_id).first()
     if not newcomer:
         raise HTTPException(status_code=404, detail="Newcomer not found")
+
+    if payload.task_id:
+        task = (
+            db.query(OnboardingTask)
+            .join(OnboardingPlan, OnboardingTask.plan_id == OnboardingPlan.id)
+            .filter(
+                OnboardingTask.id == payload.task_id,
+                OnboardingPlan.newcomer_id == payload.newcomer_id,
+            )
+            .first()
+        )
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found for newcomer")
 
     return create_blocked_report(
         db=db,

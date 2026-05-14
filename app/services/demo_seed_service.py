@@ -1,14 +1,22 @@
 from sqlalchemy.orm import Session
 
+from app.models.ai_answer_feedback import AIAnswerFeedback
 from app.models.ai_question import AIQuestion, AIQuestionSource
 from app.models.ai_signal import AISignal
+from app.models.ai_signal_feedback import AISignalFeedback
+from app.models.blocked_report import BlockedReport
+from app.models.company_onboarding_gap import CompanyOnboardingGap
 from app.models.document import Document
+from app.models.document_chunk import DocumentChunk
+from app.models.mentor_digest import MentorDigest
 from app.models.newcomer import NewcomerProfile
 from app.models.onboarding_event import OnboardingEvent
 from app.models.onboarding_plan import OnboardingPlan
+from app.models.onboarding_reflection import OnboardingReflection
 from app.models.onboarding_task import OnboardingTask
-from app.models.person_contact import PersonContact
+from app.models.person_contact import NewcomerRecommendedContact, PersonContact
 from app.models.plan_adjustment import PlanAdjustmentSuggestion
+from app.models.progress_snapshot import ProgressSnapshot
 from app.models.user import User
 from app.services.rag_service import generate_chunks_for_document
 
@@ -114,6 +122,8 @@ DOCUMENTS = [
     },
 ]
 
+DOCUMENTS = DOCUMENTS[:4]
+
 PEOPLE = [
     {"full_name": "Marko Ivanov", "role": "Tech Lead", "team": "Payments", "email": "marko@techcorp.com", "topics": ["code_review", "architecture", "deployment", "release_approval"]},
     {"full_name": "Victor Petrenko", "role": "DevOps Engineer", "team": "Infrastructure", "email": "victor@techcorp.com", "topics": ["deployment", "kubernetes", "docker", "infrastructure", "staging"]},
@@ -142,6 +152,38 @@ AI_QUESTIONS = [
     {"question": "What is the rollback process if something goes wrong after deploy?", "answer": "If issues arise after a production deploy, run: kubectl rollout undo deployment/payment-gateway -n payments. Then monitor the Grafana dashboard and notify the team in #deploys. Victor (DevOps) can assist with infrastructure issues."},
     {"question": "How do I check if the staging pipeline passed?", "answer": "Check GitHub Actions in your PR for CI/CD status. The staging deploy is automatic after CI passes. You can verify on staging.payments.techcorp.internal. If the pipeline is red, check the Actions logs for the failing step."},
 ]
+
+
+def reset_demo_data(db: Session) -> dict:
+    try:
+        for model in [
+            AISignalFeedback,
+            AIAnswerFeedback,
+            AIQuestionSource,
+            AIQuestion,
+            BlockedReport,
+            PlanAdjustmentSuggestion,
+            AISignal,
+            ProgressSnapshot,
+            OnboardingReflection,
+            OnboardingEvent,
+            NewcomerRecommendedContact,
+            OnboardingTask,
+            OnboardingPlan,
+            NewcomerProfile,
+            MentorDigest,
+            CompanyOnboardingGap,
+            DocumentChunk,
+            Document,
+            PersonContact,
+            User,
+        ]:
+            db.query(model).delete(synchronize_session=False)
+        db.commit()
+        return seed_demo_data(db=db)
+    except Exception:
+        db.rollback()
+        raise
 
 
 def seed_demo_data(db: Session) -> dict:
@@ -229,8 +271,36 @@ def seed_demo_data(db: Session) -> dict:
             metadata_json={"task_title": t["title"], "status": t["status"]},
         ))
 
+    blocked_task = next((task for task in created_tasks if task.status == "blocked"), None)
+    if blocked_task:
+        report = BlockedReport(
+            newcomer_id=newcomer.id,
+            task_id=blocked_task.id,
+            user_id=newcomer_user.id,
+            blocker_type="access_issue",
+            details=(
+                "I read the deployment guide but I still cannot access the staging namespace "
+                "and I am not sure who should approve the first deploy."
+            ),
+            ai_suggestion=(
+                "Pair Tanya with Victor for a short deployment walkthrough and check staging permissions "
+                "before she attempts the first deploy."
+            ),
+            status="open",
+        )
+        db.add(report)
+        db.flush()
+
     # 7. AI Questions
     deployment_doc = next((d for d in created_docs if "Deployment" in d.title), None)
+    deployment_chunk = None
+    if deployment_doc:
+        deployment_chunk = (
+            db.query(DocumentChunk)
+            .filter(DocumentChunk.document_id == deployment_doc.id)
+            .order_by(DocumentChunk.chunk_index.asc(), DocumentChunk.id.asc())
+            .first()
+        )
     created_questions = []
     for q_data in AI_QUESTIONS:
         q = AIQuestion(
@@ -253,11 +323,11 @@ def seed_demo_data(db: Session) -> dict:
             topic="deployment",
         ))
 
-        if deployment_doc:
+        if deployment_doc and deployment_chunk:
             source = AIQuestionSource(
                 question_id=q.id,
                 document_id=deployment_doc.id,
-                chunk_id=1,
+                chunk_id=deployment_chunk.id,
                 title=deployment_doc.title,
                 content_preview=deployment_doc.content[:200],
                 similarity=0.85,
@@ -304,8 +374,26 @@ def seed_demo_data(db: Session) -> dict:
             "Reducing reading tasks and adding hands-on deployment practice will unblock her."
         ),
         suggested_changes=[
-            {"action": "add", "title": "Deployment pairing session with Victor", "task_type": "deployment", "week_number": 2, "priority": "high"},
-            {"action": "add", "title": "Staging deploy simulation", "task_type": "deployment", "week_number": 2, "priority": "high"},
+            {
+                "action": "add_task",
+                "title": "Deployment pairing session with Victor",
+                "description": "Walk through staging access, release approval, rollback, and monitoring.",
+                "task_type": "deployment",
+                "week_number": 2,
+                "day_number": 4,
+                "priority": "high",
+                "success_criteria": "Tanya can explain the deployment flow and knows who approves production releases.",
+            },
+            {
+                "action": "add_task",
+                "title": "Staging deploy simulation",
+                "description": "Run a safe staging deploy simulation with Victor or Marko.",
+                "task_type": "deployment",
+                "week_number": 2,
+                "day_number": 5,
+                "priority": "high",
+                "success_criteria": "Tanya can complete the staging checklist without being blocked.",
+            },
             {"action": "modify", "title": "Move first production deploy milestone by 3 days", "task_type": "deployment", "week_number": 3},
         ],
         status="pending",

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.db.session import get_db
 from app.models.user import User
@@ -10,6 +10,22 @@ from app.schemas.onboarding_plan import OnboardingPlanWithTasksRead
 
 
 router = APIRouter(prefix="/newcomers", tags=["Newcomers"])
+
+
+def serialize_newcomer(newcomer: NewcomerProfile) -> dict:
+    return {
+        "id": newcomer.id,
+        "user_id": newcomer.user_id,
+        "mentor_id": newcomer.mentor_id,
+        "full_name": newcomer.user.full_name if newcomer.user else None,
+        "email": newcomer.user.email if newcomer.user else None,
+        "job_title": newcomer.job_title,
+        "seniority": newcomer.seniority,
+        "team": newcomer.team,
+        "start_date": newcomer.start_date,
+        "onboarding_status": newcomer.onboarding_status,
+        "created_at": newcomer.created_at,
+    }
 
 
 @router.post("/", response_model=NewcomerRead)
@@ -47,23 +63,41 @@ def create_newcomer(payload: NewcomerCreate, db: Session = Depends(get_db)):
     db.add(newcomer)
     db.commit()
     db.refresh(newcomer)
+    newcomer = (
+        db.query(NewcomerProfile)
+        .options(joinedload(NewcomerProfile.user))
+        .filter(NewcomerProfile.id == newcomer.id)
+        .first()
+    )
 
-    return newcomer
+    return serialize_newcomer(newcomer)
 
 
 @router.get("/", response_model=list[NewcomerRead])
-def list_newcomers(db: Session = Depends(get_db)):
-    return db.query(NewcomerProfile).order_by(NewcomerProfile.id.desc()).all()
+def list_newcomers(
+    mentor_id: int | None = None,
+    db: Session = Depends(get_db),
+):
+    query = db.query(NewcomerProfile).options(joinedload(NewcomerProfile.user))
+    if mentor_id:
+        query = query.filter(NewcomerProfile.mentor_id == mentor_id)
+    newcomers = query.order_by(NewcomerProfile.id.desc()).all()
+    return [serialize_newcomer(newcomer) for newcomer in newcomers]
 
 
 @router.get("/{newcomer_id}", response_model=NewcomerRead)
 def get_newcomer(newcomer_id: int, db: Session = Depends(get_db)):
-    newcomer = db.query(NewcomerProfile).filter(NewcomerProfile.id == newcomer_id).first()
+    newcomer = (
+        db.query(NewcomerProfile)
+        .options(joinedload(NewcomerProfile.user))
+        .filter(NewcomerProfile.id == newcomer_id)
+        .first()
+    )
 
     if not newcomer:
         raise HTTPException(status_code=404, detail="Newcomer not found")
 
-    return newcomer
+    return serialize_newcomer(newcomer)
 
 
 @router.get("/{newcomer_id}/onboarding-plan", response_model=OnboardingPlanWithTasksRead)

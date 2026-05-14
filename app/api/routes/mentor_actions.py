@@ -11,6 +11,7 @@ router = APIRouter(prefix="/mentor-actions", tags=["Mentor Actions"])
 class DraftMessageRequest(BaseModel):
     newcomer_id: int
     signal_id: int | None = None
+    blocked_report_id: int | None = None
     tone: str = "supportive"
 
 
@@ -27,6 +28,7 @@ def draft_message(payload: DraftMessageRequest, db: Session = Depends(get_db)):
             db=db,
             newcomer_id=payload.newcomer_id,
             signal_id=payload.signal_id,
+            blocked_report_id=payload.blocked_report_id,
             tone=payload.tone,
         )
     except ValueError as e:

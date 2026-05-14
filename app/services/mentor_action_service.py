@@ -1,7 +1,9 @@
 from sqlalchemy.orm import Session
 
 from app.models.ai_signal import AISignal
+from app.models.blocked_report import BlockedReport
 from app.models.newcomer import NewcomerProfile
+from app.models.onboarding_task import OnboardingTask
 from app.services.llm_service import generate_answer
 
 
@@ -9,6 +11,7 @@ def draft_mentor_message(
     db: Session,
     newcomer_id: int,
     signal_id: int | None = None,
+    blocked_report_id: int | None = None,
     tone: str = "supportive",
 ) -> dict:
     newcomer = (
@@ -33,6 +36,27 @@ def draft_mentor_message(
                 f"Context: {signal.description}\n"
                 f"Evidence: {signal.evidence}\n"
                 f"Suggested action: {signal.suggested_action}"
+            )
+
+    if blocked_report_id:
+        report = (
+            db.query(BlockedReport)
+            .filter(
+                BlockedReport.id == blocked_report_id,
+                BlockedReport.newcomer_id == newcomer_id,
+            )
+            .first()
+        )
+        if report:
+            task = None
+            if report.task_id:
+                task = db.query(OnboardingTask).filter(OnboardingTask.id == report.task_id).first()
+            signal_title = f"Blocked: {task.title if task else report.blocker_type.replace('_', ' ')}"
+            signal_context = (
+                f"Context: The newcomer reported a blocker of type {report.blocker_type}.\n"
+                f"Task: {task.title if task else 'General blocker'}\n"
+                f"Comment: {report.details or 'No extra comment'}\n"
+                f"Suggested action: {report.ai_suggestion or 'Offer help and clarify the next step.'}"
             )
 
     tone_instructions = {

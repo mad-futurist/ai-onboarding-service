@@ -280,7 +280,7 @@ def apply_adjustment(
     changes = adjustment.suggested_changes or []
 
     for change in changes:
-        if change.get("action") != "add_task":
+        if change.get("action") not in ["add_task", "add"]:
             continue
 
         task = OnboardingTask(

@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.services.demo_seed_service import seed_demo_data
+from app.services.demo_seed_service import reset_demo_data, seed_demo_data
 
 router = APIRouter(prefix="/demo", tags=["Demo"])
 
@@ -23,4 +23,10 @@ class SeedResponse(BaseModel):
 @router.post("/seed", response_model=SeedResponse)
 def seed(db: Session = Depends(get_db)):
     result = seed_demo_data(db=db)
+    return SeedResponse(**result)
+
+
+@router.post("/reset", response_model=SeedResponse)
+def reset(db: Session = Depends(get_db)):
+    result = reset_demo_data(db=db)
     return SeedResponse(**result)
