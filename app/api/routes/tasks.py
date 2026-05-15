@@ -2,18 +2,31 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 
 from app.db.session import get_db
+from app.models.document import Document
 from app.models.onboarding_plan import OnboardingPlan
 from app.models.onboarding_task import OnboardingTask
+from app.models.week import Week
 from app.schemas.document import DocumentListItem
 from app.schemas.ai_question import AIQuestionRead
 from app.schemas.onboarding_task import (
     OnboardingTaskCreate,
+    OnboardingTaskPlanCreate,
     OnboardingTaskRead,
     OnboardingTaskStatusUpdate,
+    OnboardingTaskUpdate,
+)
+from app.schemas.ai_plan_partial import (
+    TaskAIGenerateRequest,
+    TaskAISuggestRequest,
+    TaskAISuggestResponse,
 )
 from app.services.event_logger import log_onboarding_event
 from app.services.task_detail_service import get_task_detail
 from app.services.topic_classifier import classify_topic
+from app.services.ai_plan_partial_service import (
+    ai_suggest_task_field as svc_ai_suggest_task_field,
+    ai_generate_single_task as svc_ai_generate_single_task,
+)
 from pydantic import BaseModel
 from typing import Any
 
@@ -30,6 +43,10 @@ class TaskDetailResponse(BaseModel):
 
 router = APIRouter(prefix="/tasks", tags=["Tasks"])
 
+
+# ---------------------------------------------------------------------------
+# Legacy endpoint (kept for backwards compatibility)
+# ---------------------------------------------------------------------------
 
 @router.post("/plans/{plan_id}", response_model=OnboardingTaskRead)
 def create_task_for_plan(
@@ -48,9 +65,14 @@ def create_task_for_plan(
         description=payload.description,
         week_number=payload.week_number,
         day_number=payload.day_number,
+        week_id=payload.week_id,
+        sprint_id=payload.sprint_id,
         task_type=payload.task_type,
         priority=payload.priority,
         success_criteria=payload.success_criteria,
+        acceptance_criteria=payload.acceptance_criteria,
+        examples=[e.model_dump() for e in payload.examples] if payload.examples else None,
+        links=[l.model_dump() for l in payload.links] if payload.links else None,
         status="todo",
     )
 
@@ -83,12 +105,125 @@ def list_tasks_for_plan(
     )
 
 
+# ---------------------------------------------------------------------------
+# Phase 1: scoped create + AI helpers + partial PATCH
+# ---------------------------------------------------------------------------
+
+@router.post("", response_model=OnboardingTaskRead)
+def create_task(payload: OnboardingTaskPlanCreate, db: Session = Depends(get_db)):
+    plan = db.query(OnboardingPlan).filter(OnboardingPlan.id == payload.plan_id).first()
+    if not plan:
+        raise HTTPException(status_code=404, detail="Onboarding plan not found")
+
+    week_index_for_task = payload.week_number
+    if payload.week_id is not None:
+        week = (
+            db.query(Week)
+            .filter(Week.id == payload.week_id, Week.plan_id == plan.id)
+            .first()
+        )
+        if not week:
+            raise HTTPException(status_code=404, detail="Week not found in this plan")
+        # Keep both representations in sync for legacy readers.
+        if week_index_for_task is None:
+            week_index_for_task = week.index
+
+    task = OnboardingTask(
+        plan_id=plan.id,
+        title=payload.title,
+        description=payload.description,
+        week_number=week_index_for_task,
+        day_number=payload.day_number,
+        week_id=payload.week_id,
+        sprint_id=payload.sprint_id,
+        task_type=payload.task_type,
+        priority=payload.priority,
+        success_criteria=payload.success_criteria,
+        acceptance_criteria=payload.acceptance_criteria,
+        examples=[e.model_dump() for e in payload.examples] if payload.examples else None,
+        links=[l.model_dump() for l in payload.links] if payload.links else None,
+        status="todo",
+    )
+    db.add(task)
+    db.commit()
+    db.refresh(task)
+    return task
+
+
+@router.post("/ai-generate", response_model=OnboardingTaskRead)
+def ai_generate_task(payload: TaskAIGenerateRequest, db: Session = Depends(get_db)):
+    plan = db.query(OnboardingPlan).filter(OnboardingPlan.id == payload.plan_id).first()
+    if not plan:
+        raise HTTPException(status_code=404, detail="Onboarding plan not found")
+
+    week = None
+    if payload.week_id is not None:
+        week = (
+            db.query(Week)
+            .filter(Week.id == payload.week_id, Week.plan_id == plan.id)
+            .first()
+        )
+        if not week:
+            raise HTTPException(status_code=404, detail="Week not found in this plan")
+
+    documents: list[Document] = []
+    if payload.document_ids:
+        documents = db.query(Document).filter(Document.id.in_(payload.document_ids)).all()
+
+    ai_task = svc_ai_generate_single_task(
+        plan=plan,
+        prompt_hint=payload.prompt_hint,
+        week=week,
+        sprint_id=payload.sprint_id,
+        documents=documents,
+    )
+
+    week_number_for_task = ai_task.week_number
+    if week_number_for_task is None and week is not None:
+        week_number_for_task = week.index
+
+    task = OnboardingTask(
+        plan_id=plan.id,
+        title=ai_task.title,
+        description=ai_task.description,
+        week_number=week_number_for_task,
+        day_number=ai_task.day_number,
+        week_id=week.id if week else None,
+        sprint_id=payload.sprint_id,
+        task_type=ai_task.task_type,
+        priority=ai_task.priority,
+        success_criteria=ai_task.success_criteria,
+        status="todo",
+    )
+    db.add(task)
+    db.commit()
+    db.refresh(task)
+    return task
+
+
+@router.post("/{task_id}/ai-suggest", response_model=TaskAISuggestResponse)
+def ai_suggest_task_field(
+    task_id: int,
+    payload: TaskAISuggestRequest,
+    db: Session = Depends(get_db),
+):
+    task = db.query(OnboardingTask).filter(OnboardingTask.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    suggestion = svc_ai_suggest_task_field(
+        task=task,
+        field=payload.field,
+        instruction=payload.instruction,
+    )
+    return TaskAISuggestResponse(field=payload.field, suggestion=suggestion)
+
+
 @router.get("/{task_id}/detail")
 def get_task_detail_view(task_id: int, db: Session = Depends(get_db)):
     detail = get_task_detail(db=db, task_id=task_id)
     if not detail:
         raise HTTPException(status_code=404, detail="Task not found")
-    from app.schemas.person_contact import PersonContactRead
     return {
         "task": detail["task"],
         "why_it_matters": detail["why_it_matters"],
@@ -164,6 +299,47 @@ def update_task_status(
     db.commit()
     db.refresh(task)
 
+    return task
+
+
+@router.patch("/{task_id}", response_model=OnboardingTaskRead)
+def update_task(
+    task_id: int,
+    payload: OnboardingTaskUpdate,
+    db: Session = Depends(get_db),
+):
+    """Partial update of enriched task fields.
+
+    Each field in the payload is added to `manually_edited_fields` so that
+    future scope-aware regenerations preserve the mentor's edits by default.
+    """
+    task = db.query(OnboardingTask).filter(OnboardingTask.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    updates = payload.model_dump(exclude_unset=True)
+    edited: set[str] = set()
+
+    for field, value in updates.items():
+        if field in ("examples", "links") and value is not None:
+            # Pydantic gave us list[TaskExample]/list[TaskLink] models — serialize.
+            value = [v.model_dump() if hasattr(v, "model_dump") else v for v in value]
+        setattr(task, field, value)
+        edited.add(field)
+
+    # If week_id changed and week_number wasn't explicitly given, mirror the index.
+    if "week_id" in edited and "week_number" not in edited and task.week_id is not None:
+        week = db.query(Week).filter(Week.id == task.week_id).first()
+        if week:
+            task.week_number = week.index
+
+    current = task.manually_edited_fields or []
+    if not isinstance(current, list):
+        current = []
+    task.manually_edited_fields = sorted(set(current) | edited)
+
+    db.commit()
+    db.refresh(task)
     return task
 
 

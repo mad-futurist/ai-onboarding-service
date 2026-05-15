@@ -37,3 +37,17 @@ class OnboardingPlan(Base):
         back_populates="plan",
         cascade="all, delete-orphan",
     )
+
+    sprints = relationship(
+        "Sprint",
+        back_populates="plan",
+        cascade="all, delete-orphan",
+        order_by="Sprint.index",
+    )
+
+    weeks = relationship(
+        "Week",
+        back_populates="plan",
+        cascade="all, delete-orphan",
+        order_by="Week.index",
+    )

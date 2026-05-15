@@ -26,6 +26,11 @@ from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
 from app.models.onboarding_plan import OnboardingPlan
 from app.models.onboarding_task import OnboardingTask
+from app.models.sprint import Sprint
+from app.models.week import Week
+from app.models.course import Course
+from app.models.lesson import Lesson
+from app.models.scheduled_meeting import ScheduledMeeting
 from app.models.ai_question import AIQuestion, AIQuestionSource
 from app.models.ai_signal import AISignal
 from app.models.onboarding_event import OnboardingEvent

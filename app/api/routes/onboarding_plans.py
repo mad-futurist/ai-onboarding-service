@@ -5,16 +5,28 @@ from app.db.session import get_db
 from app.models.newcomer import NewcomerProfile
 from app.models.onboarding_plan import OnboardingPlan
 from app.models.onboarding_task import OnboardingTask
+from app.models.sprint import Sprint
+from app.models.week import Week
 from app.schemas.onboarding_plan import (
     OnboardingPlanCreate,
     OnboardingPlanCreateWithTasks,
     OnboardingPlanRead,
     OnboardingPlanWithTasksRead,
 )
+from app.schemas.sprint import SprintCreate, SprintRead, SprintUpdate
+from app.schemas.week import WeekCreate, WeekRead, WeekUpdate
+from app.schemas.ai_plan_partial import (
+    PlanRegenerateRequest,
+    PlanRegenerateResponse,
+)
 
 from app.models.document import Document
 from app.schemas.ai_plan import AIPlanGenerationRequest, AIPlanGenerationResponse
 from app.services.ai_plan_service import generate_onboarding_plan_with_ai
+from app.services.ai_plan_partial_service import (
+    regenerate_week as svc_regenerate_week,
+    regenerate_task as svc_regenerate_task,
+)
 
 
 router = APIRouter(prefix="/onboarding-plans", tags=["Onboarding Plans"])
@@ -204,3 +216,274 @@ def approve_onboarding_plan(plan_id: int, db: Session = Depends(get_db)):
     db.refresh(plan)
 
     return plan
+
+
+# ---------------------------------------------------------------------------
+# Phase 1: scope-aware regeneration
+# ---------------------------------------------------------------------------
+
+def _load_documents(db: Session, ids: list[int]) -> list[Document]:
+    if not ids:
+        return []
+    docs = db.query(Document).filter(Document.id.in_(ids)).all()
+    found = {d.id for d in docs}
+    missing = set(ids) - found
+    if missing:
+        raise HTTPException(status_code=404, detail=f"Documents not found: {sorted(missing)}")
+    return docs
+
+
+@router.post("/{plan_id}/regenerate", response_model=PlanRegenerateResponse)
+def regenerate_plan(
+    plan_id: int,
+    payload: PlanRegenerateRequest,
+    db: Session = Depends(get_db),
+):
+    plan = db.query(OnboardingPlan).filter(OnboardingPlan.id == plan_id).first()
+    if not plan:
+        raise HTTPException(status_code=404, detail="Onboarding plan not found")
+
+    documents = _load_documents(db, payload.document_ids)
+
+    if payload.scope == "plan":
+        # Defer to the legacy full-plan generator.
+        if not plan.newcomer:
+            raise HTTPException(status_code=400, detail="Plan has no newcomer attached")
+        ai_result = generate_onboarding_plan_with_ai(
+            newcomer=plan.newcomer,
+            documents=documents,
+            mentor_notes=payload.mentor_notes,
+        )
+        ai_plan = ai_result.plan
+
+        plan.title = ai_plan.title
+        plan.description = (
+            f"{ai_plan.description}\n\n"
+            f"Plan summary: {ai_plan.plan_summary}\n\n"
+            f"First 30 days goal: {ai_plan.first_30_days_goal}\n"
+            f"Days 31-60 goal: {ai_plan.days_31_60_goal}\n"
+            f"Days 61-90 goal: {ai_plan.days_61_90_goal}\n\n"
+            f"Mentor focus: {ai_plan.mentor_focus}\n"
+            f"Newcomer focus: {ai_plan.newcomer_focus}\n\n"
+            f"Risk areas: {', '.join(ai_plan.risk_areas)}"
+        )
+        plan.generated_by_ai = True
+        plan.mentor_approved = False
+        plan.status = "draft"
+
+        # Wipe existing tasks (consistent with full-regen intent).
+        db.query(OnboardingTask).filter(OnboardingTask.plan_id == plan.id).delete()
+        db.flush()
+
+        new_task_ids: list[int] = []
+        for task_output in ai_plan.tasks:
+            task = OnboardingTask(
+                plan_id=plan.id,
+                title=task_output.title,
+                description=task_output.description,
+                week_number=task_output.week_number,
+                day_number=task_output.day_number,
+                task_type=task_output.task_type,
+                priority=task_output.priority,
+                success_criteria=task_output.success_criteria,
+                status="todo",
+            )
+            db.add(task)
+            db.flush()
+            new_task_ids.append(task.id)
+
+        db.commit()
+
+        return PlanRegenerateResponse(
+            scope="plan",
+            plan_id=plan.id,
+            target_id=None,
+            summary=f"Plan regenerated with {len(ai_plan.tasks)} tasks.",
+            affected_task_ids=new_task_ids,
+            used_fallback=ai_result.used_fallback,
+        )
+
+    if payload.scope == "week":
+        if not payload.target_id:
+            raise HTTPException(status_code=400, detail="target_id is required for scope=week")
+        week = (
+            db.query(Week)
+            .filter(Week.id == payload.target_id, Week.plan_id == plan.id)
+            .first()
+        )
+        if not week:
+            raise HTTPException(status_code=404, detail="Week not found")
+        result = svc_regenerate_week(
+            db=db,
+            plan=plan,
+            week=week,
+            preserve_manual_edits=payload.preserve_manual_edits,
+            mentor_notes=payload.mentor_notes,
+            documents=documents,
+        )
+        return PlanRegenerateResponse(
+            scope="week",
+            plan_id=plan.id,
+            target_id=week.id,
+            summary=result["summary"] or f"Week {week.index} regenerated.",
+            affected_task_ids=result["affected_task_ids"],
+            affected_week_ids=[week.id],
+            used_fallback=result["used_fallback"],
+        )
+
+    if payload.scope == "task":
+        if not payload.target_id:
+            raise HTTPException(status_code=400, detail="target_id is required for scope=task")
+        task = (
+            db.query(OnboardingTask)
+            .filter(
+                OnboardingTask.id == payload.target_id,
+                OnboardingTask.plan_id == plan.id,
+            )
+            .first()
+        )
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+        result = svc_regenerate_task(
+            db=db,
+            task=task,
+            preserve_manual_edits=payload.preserve_manual_edits,
+            mentor_notes=payload.mentor_notes,
+            documents=documents,
+        )
+        return PlanRegenerateResponse(
+            scope="task",
+            plan_id=plan.id,
+            target_id=task.id,
+            summary=f"Task {task.id} regenerated (fields updated: {result['fields_updated']}).",
+            affected_task_ids=[task.id],
+            used_fallback=result["used_fallback"],
+        )
+
+    raise HTTPException(status_code=400, detail=f"Unknown scope: {payload.scope}")
+
+
+# ---------------------------------------------------------------------------
+# Sprints CRUD
+# ---------------------------------------------------------------------------
+
+@router.get("/{plan_id}/sprints", response_model=list[SprintRead])
+def list_sprints(plan_id: int, db: Session = Depends(get_db)):
+    plan = db.query(OnboardingPlan).filter(OnboardingPlan.id == plan_id).first()
+    if not plan:
+        raise HTTPException(status_code=404, detail="Onboarding plan not found")
+    return (
+        db.query(Sprint)
+        .filter(Sprint.plan_id == plan_id)
+        .order_by(Sprint.index.asc(), Sprint.id.asc())
+        .all()
+    )
+
+
+@router.post("/{plan_id}/sprints", response_model=SprintRead)
+def create_sprint(plan_id: int, payload: SprintCreate, db: Session = Depends(get_db)):
+    plan = db.query(OnboardingPlan).filter(OnboardingPlan.id == plan_id).first()
+    if not plan:
+        raise HTTPException(status_code=404, detail="Onboarding plan not found")
+    sprint = Sprint(
+        plan_id=plan_id,
+        index=payload.index,
+        title=payload.title,
+        description=payload.description,
+        start_day=payload.start_day,
+        end_day=payload.end_day,
+    )
+    db.add(sprint)
+    db.commit()
+    db.refresh(sprint)
+    return sprint
+
+
+@router.patch("/sprints/{sprint_id}", response_model=SprintRead)
+def update_sprint(sprint_id: int, payload: SprintUpdate, db: Session = Depends(get_db)):
+    sprint = db.query(Sprint).filter(Sprint.id == sprint_id).first()
+    if not sprint:
+        raise HTTPException(status_code=404, detail="Sprint not found")
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(sprint, field, value)
+    db.commit()
+    db.refresh(sprint)
+    return sprint
+
+
+@router.delete("/sprints/{sprint_id}")
+def delete_sprint(sprint_id: int, db: Session = Depends(get_db)):
+    sprint = db.query(Sprint).filter(Sprint.id == sprint_id).first()
+    if not sprint:
+        raise HTTPException(status_code=404, detail="Sprint not found")
+    db.delete(sprint)
+    db.commit()
+    return {"detail": "Sprint deleted", "sprint_id": sprint_id}
+
+
+# ---------------------------------------------------------------------------
+# Weeks CRUD
+# ---------------------------------------------------------------------------
+
+@router.get("/{plan_id}/weeks", response_model=list[WeekRead])
+def list_weeks(plan_id: int, db: Session = Depends(get_db)):
+    plan = db.query(OnboardingPlan).filter(OnboardingPlan.id == plan_id).first()
+    if not plan:
+        raise HTTPException(status_code=404, detail="Onboarding plan not found")
+    return (
+        db.query(Week)
+        .filter(Week.plan_id == plan_id)
+        .order_by(Week.index.asc(), Week.id.asc())
+        .all()
+    )
+
+
+@router.post("/{plan_id}/weeks", response_model=WeekRead)
+def create_week(plan_id: int, payload: WeekCreate, db: Session = Depends(get_db)):
+    plan = db.query(OnboardingPlan).filter(OnboardingPlan.id == plan_id).first()
+    if not plan:
+        raise HTTPException(status_code=404, detail="Onboarding plan not found")
+
+    if payload.sprint_id is not None:
+        sprint = (
+            db.query(Sprint)
+            .filter(Sprint.id == payload.sprint_id, Sprint.plan_id == plan_id)
+            .first()
+        )
+        if not sprint:
+            raise HTTPException(status_code=404, detail="Sprint not found in this plan")
+
+    week = Week(
+        plan_id=plan_id,
+        sprint_id=payload.sprint_id,
+        index=payload.index,
+        title=payload.title,
+        summary=payload.summary,
+        goals=payload.goals,
+    )
+    db.add(week)
+    db.commit()
+    db.refresh(week)
+    return week
+
+
+@router.patch("/weeks/{week_id}", response_model=WeekRead)
+def update_week(week_id: int, payload: WeekUpdate, db: Session = Depends(get_db)):
+    week = db.query(Week).filter(Week.id == week_id).first()
+    if not week:
+        raise HTTPException(status_code=404, detail="Week not found")
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(week, field, value)
+    db.commit()
+    db.refresh(week)
+    return week
+
+
+@router.delete("/weeks/{week_id}")
+def delete_week(week_id: int, db: Session = Depends(get_db)):
+    week = db.query(Week).filter(Week.id == week_id).first()
+    if not week:
+        raise HTTPException(status_code=404, detail="Week not found")
+    db.delete(week)
+    db.commit()
+    return {"detail": "Week deleted", "week_id": week_id}

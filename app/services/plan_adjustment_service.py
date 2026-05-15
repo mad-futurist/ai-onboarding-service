@@ -208,6 +208,9 @@ def generate_adjustment_from_signal(
         ),
         suggested_changes=changes,
         status="pending",
+        target_scope=signal.target_scope,
+        target_week_id=signal.target_week_id,
+        target_task_id=signal.target_task_id,
     )
 
     db.add(adjustment)
@@ -280,22 +283,69 @@ def apply_adjustment(
     changes = adjustment.suggested_changes or []
 
     for change in changes:
-        if change.get("action") not in ["add_task", "add"]:
+        action = change.get("action")
+
+        if action in ("add_task", "add"):
+            task = OnboardingTask(
+                plan_id=adjustment.plan_id,
+                title=change.get("title"),
+                description=change.get("description"),
+                week_number=change.get("week_number"),
+                day_number=change.get("day_number"),
+                week_id=adjustment.target_week_id if adjustment.target_scope == "week" else change.get("week_id"),
+                task_type=change.get("task_type") or "general",
+                priority=change.get("priority") or "medium",
+                success_criteria=change.get("success_criteria"),
+                acceptance_criteria=change.get("acceptance_criteria"),
+                status="todo",
+            )
+            db.add(task)
             continue
 
-        task = OnboardingTask(
-            plan_id=adjustment.plan_id,
-            title=change.get("title"),
-            description=change.get("description"),
-            week_number=change.get("week_number"),
-            day_number=change.get("day_number"),
-            task_type=change.get("task_type") or "general",
-            priority=change.get("priority") or "medium",
-            success_criteria=change.get("success_criteria"),
-            status="todo",
-        )
+        if action == "update_task_field" and adjustment.target_task_id:
+            target_task = (
+                db.query(OnboardingTask)
+                .filter(OnboardingTask.id == adjustment.target_task_id)
+                .first()
+            )
+            if target_task:
+                field = change.get("field")
+                value = change.get("value")
+                if field in {
+                    "title",
+                    "description",
+                    "success_criteria",
+                    "acceptance_criteria",
+                    "task_type",
+                    "priority",
+                    "examples",
+                    "links",
+                }:
+                    setattr(target_task, field, value)
+            continue
 
-        db.add(task)
+        if action == "replace_task" and adjustment.target_task_id:
+            target_task = (
+                db.query(OnboardingTask)
+                .filter(OnboardingTask.id == adjustment.target_task_id)
+                .first()
+            )
+            if target_task:
+                for field in (
+                    "title",
+                    "description",
+                    "week_number",
+                    "day_number",
+                    "task_type",
+                    "priority",
+                    "success_criteria",
+                    "acceptance_criteria",
+                ):
+                    if field in change:
+                        setattr(target_task, field, change[field])
+            continue
+
+        # Unknown action — skip silently (forward-compatible).
 
     adjustment.status = "applied"
     adjustment.applied_at = utc_now()

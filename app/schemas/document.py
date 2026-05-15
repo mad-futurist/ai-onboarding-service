@@ -6,12 +6,14 @@ from app.schemas.document_chunk import DocumentChunkRead
 
 class DocumentCreate(BaseModel):
     title: str
-    content: str
+    content: str = ""
     source: str | None = None
     document_type: str | None = None
     domain: str | None = None
     role_target: str | None = None
     scope: str | None = None
+    source_type: str | None = None
+    external_url: str | None = None
 
 
 class DocumentUpdate(BaseModel):
@@ -22,6 +24,8 @@ class DocumentUpdate(BaseModel):
     domain: str | None = None
     role_target: str | None = None
     scope: str | None = None
+    source_type: str | None = None
+    external_url: str | None = None
 
 
 class DocumentRead(BaseModel):
@@ -33,6 +37,8 @@ class DocumentRead(BaseModel):
     domain: str | None
     role_target: str | None
     scope: str | None
+    source_type: str | None = None
+    external_url: str | None = None
     created_at: datetime
 
     class Config:
@@ -47,6 +53,8 @@ class DocumentListItem(BaseModel):
     domain: str | None
     role_target: str | None
     scope: str | None
+    source_type: str | None = None
+    external_url: str | None = None
     created_at: datetime
 
     class Config:

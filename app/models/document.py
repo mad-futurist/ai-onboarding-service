@@ -17,6 +17,9 @@ class Document(Base):
     role_target = Column(String(255), nullable=True)   # backend_developer | qa | all | etc.
     scope = Column(String(50), nullable=True)          # enterprise | team | role
 
+    source_type = Column(String(20), nullable=True)    # text | url | github_link | gitlab_link
+    external_url = Column(String(1024), nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     chunks = relationship(

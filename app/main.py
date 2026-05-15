@@ -23,6 +23,8 @@ from app.api.routes import newcomer_kb
 from app.api.routes import user_story
 from app.api.routes import knowledge
 from app.api.routes import demo
+from app.api.routes import courses
+from app.api.routes import meetings
 
 
 app = FastAPI(title=settings.APP_NAME)
@@ -59,3 +61,5 @@ app.include_router(newcomer_kb.router)
 app.include_router(user_story.router)
 app.include_router(knowledge.router)
 app.include_router(demo.router)
+app.include_router(courses.router)
+app.include_router(meetings.router)

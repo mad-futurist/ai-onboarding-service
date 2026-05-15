@@ -31,6 +31,20 @@ class AISignal(Base):
 
     occurrence_count = Column(Integer, nullable=False, default=1)
 
+    target_scope = Column(String(20), nullable=True)
+    target_week_id = Column(
+        Integer,
+        ForeignKey("weeks.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    target_task_id = Column(
+        Integer,
+        ForeignKey("onboarding_tasks.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     last_seen_at = Column(DateTime(timezone=True), server_default=func.now())
     resolved_at = Column(DateTime(timezone=True), nullable=True)

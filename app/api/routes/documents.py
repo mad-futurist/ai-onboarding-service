@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.db.session import get_db
@@ -37,12 +38,14 @@ def get_knowledge_base(db: Session = Depends(get_db)):
 def create_document(payload: DocumentCreate, db: Session = Depends(get_db)):
     document = Document(
         title=payload.title,
-        content=payload.content,
+        content=payload.content or "",
         source=payload.source,
         document_type=payload.document_type,
         domain=payload.domain,
         role_target=payload.role_target,
         scope=payload.scope,
+        source_type=payload.source_type,
+        external_url=payload.external_url,
     )
 
     db.add(document)
@@ -57,6 +60,11 @@ def list_documents(
     domain: str | None = None,
     role_target: str | None = None,
     scope: str | None = None,
+    document_type: str | None = None,
+    source_type: str | None = None,
+    q: str | None = None,
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ):
     query = db.query(Document)
@@ -66,7 +74,19 @@ def list_documents(
         query = query.filter(Document.role_target == role_target)
     if scope:
         query = query.filter(Document.scope == scope)
-    return query.order_by(Document.id.desc()).all()
+    if document_type:
+        query = query.filter(Document.document_type == document_type)
+    if source_type:
+        query = query.filter(Document.source_type == source_type)
+    if q:
+        like = f"%{q}%"
+        query = query.filter(or_(Document.title.ilike(like), Document.source.ilike(like)))
+    return (
+        query.order_by(Document.id.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
 
 
 @router.get("/{document_id}", response_model=DocumentRead)
@@ -105,26 +125,8 @@ def update_document(
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    if payload.title is not None:
-        document.title = payload.title
-
-    if payload.content is not None:
-        document.content = payload.content
-
-    if payload.source is not None:
-        document.source = payload.source
-
-    if payload.document_type is not None:
-        document.document_type = payload.document_type
-
-    if payload.domain is not None:
-        document.domain = payload.domain
-
-    if payload.role_target is not None:
-        document.role_target = payload.role_target
-
-    if payload.scope is not None:
-        document.scope = payload.scope
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(document, field, value)
 
     db.commit()
     db.refresh(document)

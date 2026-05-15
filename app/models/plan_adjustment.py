@@ -36,6 +36,20 @@ class PlanAdjustmentSuggestion(Base):
 
     status = Column(String(50), nullable=False, default="pending")
 
+    target_scope = Column(String(20), nullable=True)
+    target_week_id = Column(
+        Integer,
+        ForeignKey("weeks.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    target_task_id = Column(
+        Integer,
+        ForeignKey("onboarding_tasks.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
     applied_at = Column(DateTime(timezone=True), nullable=True)
