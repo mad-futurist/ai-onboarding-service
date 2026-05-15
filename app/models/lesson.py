@@ -25,6 +25,8 @@ class Lesson(Base):
     infographic_kind = Column(String(50), nullable=True)  # mermaid | svg | png
     infographic_source = Column(Text, nullable=True)      # raw mermaid/svg source
 
+    video_url = Column(String(1024), nullable=True)
+
     source_document_ids = Column(JSON, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())

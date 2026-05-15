@@ -7,9 +7,27 @@ from app.models.newcomer import NewcomerProfile
 from app.schemas.document import DocumentListItem
 from app.services.newcomer_kb_service import get_documents_for_newcomer, get_document_with_chunk_count
 from app.services.rag_service import ask_ai_with_sources
+from app.services.mindmap_service import generate_mindmap_for_document
 from app.schemas.ai_question import AIAskResponse
 
 router = APIRouter(prefix="/newcomer-kb", tags=["Newcomer Knowledge Base"])
+
+
+class MindMapNodeRead(BaseModel):
+    id: str
+    label: str
+    kind: str | None = None
+
+
+class MindMapEdgeRead(BaseModel):
+    source: str
+    target: str
+
+
+class MindMapResponse(BaseModel):
+    root: str
+    nodes: list[MindMapNodeRead]
+    edges: list[MindMapEdgeRead]
 
 
 class NewcomerDocumentRead(BaseModel):
@@ -83,3 +101,23 @@ def ask_about_document(
     )
 
     return ai_question
+
+
+@router.post(
+    "/{newcomer_id}/documents/{document_id}/mindmap",
+    response_model=MindMapResponse,
+)
+def generate_document_mindmap(
+    newcomer_id: int,
+    document_id: int,
+    db: Session = Depends(get_db),
+):
+    newcomer = db.query(NewcomerProfile).filter(NewcomerProfile.id == newcomer_id).first()
+    if not newcomer:
+        raise HTTPException(status_code=404, detail="Newcomer not found")
+
+    result = generate_mindmap_for_document(db=db, document_id=document_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    return result
