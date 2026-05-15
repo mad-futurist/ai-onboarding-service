@@ -31,6 +31,45 @@ from app.services.ai_plan_partial_service import (
 
 router = APIRouter(prefix="/onboarding-plans", tags=["Onboarding Plans"])
 
+
+def _build_generation_notes(payload: AIPlanGenerationRequest) -> str | None:
+    context = []
+    if payload.period_label:
+        context.append(f"Plan period: {payload.period_label}")
+    if payload.period_start or payload.period_end:
+        start = payload.period_start.isoformat() if payload.period_start else "not set"
+        end = payload.period_end.isoformat() if payload.period_end else "not set"
+        context.append(f"Period dates: {start} to {end}")
+    if payload.goal:
+        context.append(f"Plan goal: {payload.goal}")
+
+    sections = []
+    if payload.mentor_notes:
+        sections.append(payload.mentor_notes)
+    if context:
+        sections.append("New plan brief:\n" + "\n".join(context))
+    return "\n\n".join(sections) or None
+
+
+@router.get("", response_model=list[OnboardingPlanWithTasksRead])
+def list_onboarding_plans(
+    newcomer_id: int | None = None,
+    mentor_id: int | None = None,
+    status: str | None = None,
+    db: Session = Depends(get_db),
+):
+    query = db.query(OnboardingPlan)
+
+    if newcomer_id is not None:
+        query = query.filter(OnboardingPlan.newcomer_id == newcomer_id)
+    if mentor_id is not None:
+        query = query.filter(OnboardingPlan.mentor_id == mentor_id)
+    if status:
+        query = query.filter(OnboardingPlan.status == status)
+
+    return query.order_by(OnboardingPlan.id.desc()).all()
+
+
 @router.post("/generate", response_model=AIPlanGenerationResponse)
 def generate_onboarding_plan(
     payload: AIPlanGenerationRequest,
@@ -64,10 +103,10 @@ def generate_onboarding_plan(
             )
 
     ai_result = generate_onboarding_plan_with_ai(
-                                        newcomer=newcomer,
-                                        documents=documents,
-                                        mentor_notes=payload.mentor_notes,
-                                        )
+        newcomer=newcomer,
+        documents=documents,
+        mentor_notes=_build_generation_notes(payload),
+    )
 
     ai_plan = ai_result.plan
 
@@ -85,6 +124,10 @@ def generate_onboarding_plan(
             f"Newcomer focus: {ai_plan.newcomer_focus}\n\n"
             f"Risk areas: {', '.join(ai_plan.risk_areas)}"
         ),
+        period_label=payload.period_label,
+        period_start=payload.period_start,
+        period_end=payload.period_end,
+        goal=payload.goal,
         status="draft",
         generated_by_ai=True,
         mentor_approved=False,
@@ -137,6 +180,10 @@ def create_onboarding_plan(payload: OnboardingPlanCreate, db: Session = Depends(
         mentor_id=payload.mentor_id,
         title=payload.title,
         description=payload.description,
+        period_label=payload.period_label,
+        period_start=payload.period_start,
+        period_end=payload.period_end,
+        goal=payload.goal,
         status="draft",
         generated_by_ai=False,
         mentor_approved=False,
@@ -164,6 +211,10 @@ def create_onboarding_plan_with_tasks(
         mentor_id=payload.mentor_id,
         title=payload.title,
         description=payload.description,
+        period_label=payload.period_label,
+        period_start=payload.period_start,
+        period_end=payload.period_end,
+        goal=payload.goal,
         status="draft",
         generated_by_ai=False,
         mentor_approved=False,

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from pydantic import BaseModel
 
 from app.schemas.onboarding_task import OnboardingTaskCreate, OnboardingTaskRead
@@ -9,6 +9,10 @@ class OnboardingPlanCreate(BaseModel):
     mentor_id: int | None = None
     title: str
     description: str | None = None
+    period_label: str | None = None
+    period_start: date | None = None
+    period_end: date | None = None
+    goal: str | None = None
 
 
 class OnboardingPlanRead(BaseModel):
@@ -17,6 +21,10 @@ class OnboardingPlanRead(BaseModel):
     mentor_id: int | None
     title: str
     description: str | None
+    period_label: str | None
+    period_start: date | None
+    period_end: date | None
+    goal: str | None
     status: str
     generated_by_ai: bool
     mentor_approved: bool
@@ -36,4 +44,8 @@ class OnboardingPlanCreateWithTasks(BaseModel):
     mentor_id: int | None = None
     title: str
     description: str | None = None
+    period_label: str | None = None
+    period_start: date | None = None
+    period_end: date | None = None
+    goal: str | None = None
     tasks: list[OnboardingTaskCreate] = []

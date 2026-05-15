@@ -1,3 +1,5 @@
+from datetime import date
+
 from pydantic import BaseModel, Field
 
 
@@ -5,6 +7,10 @@ class AIPlanGenerationRequest(BaseModel):
     newcomer_id: int
     mentor_notes: str | None = None
     document_ids: list[int] = Field(default_factory=list)
+    period_label: str | None = None
+    period_start: date | None = None
+    period_end: date | None = None
+    goal: str | None = None
 
 
 class AIPlanTaskOutput(BaseModel):

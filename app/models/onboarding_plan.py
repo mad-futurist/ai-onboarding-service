@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, func
+from sqlalchemy import Column, Integer, String, Text, Boolean, Date, DateTime, ForeignKey, func
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
@@ -14,6 +14,10 @@ class OnboardingPlan(Base):
 
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
+    period_label = Column(String(255), nullable=True)
+    period_start = Column(Date, nullable=True)
+    period_end = Column(Date, nullable=True)
+    goal = Column(Text, nullable=True)
 
     status = Column(String(50), default="draft", nullable=False)
 
