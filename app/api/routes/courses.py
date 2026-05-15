@@ -146,7 +146,18 @@ def list_courses(
         )
     if status:
         query = query.filter(Course.status == status)
-    return query.order_by(Course.id.desc()).all()
+    courses = query.order_by(Course.id.desc()).all()
+
+    if courses:
+        counts = dict(
+            db.query(Lesson.course_id, func.count(Lesson.id))
+            .filter(Lesson.course_id.in_([c.id for c in courses]))
+            .group_by(Lesson.course_id)
+            .all()
+        )
+        for course in courses:
+            course.lessons_count = counts.get(course.id, 0)  # type: ignore[attr-defined]
+    return courses
 
 
 @router.post("", response_model=CourseRead)
@@ -212,6 +223,7 @@ def get_course(
         )
         if not newcomer or not _is_course_visible_to_newcomer(course, newcomer):
             raise HTTPException(status_code=404, detail="Course not found")
+    course.lessons_count = len(course.lessons)  # type: ignore[attr-defined]
     return course
 
 

@@ -43,6 +43,7 @@ from app.models.ai_answer_feedback import AIAnswerFeedback
 from app.models.ai_signal_feedback import AISignalFeedback
 from app.models.progress_snapshot import ProgressSnapshot
 from app.models.onboarding_reflection import OnboardingReflection
+from app.models.lesson_note import LessonNote
 
 target_metadata = Base.metadata
 # other values from the config, defined by the needs of env.py,

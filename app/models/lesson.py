@@ -28,6 +28,7 @@ class Lesson(Base):
     video_url = Column(String(1024), nullable=True)
 
     source_document_ids = Column(JSON, nullable=True)
+    takeaways = Column(JSON, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
