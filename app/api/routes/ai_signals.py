@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -85,6 +87,26 @@ def list_ai_signals(
     if status:
         query = query.filter(AISignal.status == status)
 
+    return query.order_by(AISignal.id.desc()).all()
+
+
+@router.get("/me", response_model=list[AISignalRead])
+def list_my_signals(
+    newcomer_id: int = Query(..., description="Active newcomer id from demo context"),
+    status: str | None = None,
+    db: Session = Depends(get_db),
+):
+    newcomer = (
+        db.query(NewcomerProfile)
+        .filter(NewcomerProfile.id == newcomer_id)
+        .first()
+    )
+    if not newcomer:
+        raise HTTPException(status_code=404, detail="Newcomer not found")
+
+    query = db.query(AISignal).filter(AISignal.newcomer_id == newcomer_id)
+    if status:
+        query = query.filter(AISignal.status == status)
     return query.order_by(AISignal.id.desc()).all()
 
 
@@ -189,6 +211,8 @@ def create_signal_feedback(
         user_id=payload.user_id,
         feedback_type=payload.feedback_type,
         comment=payload.comment,
+        visibility=payload.visibility,
+        author_role=payload.author_role,
     )
     db.add(feedback)
     db.commit()
@@ -199,3 +223,118 @@ def create_signal_feedback(
 @router.get("/feedback/", response_model=list[AISignalFeedbackRead])
 def list_signal_feedbacks(db: Session = Depends(get_db)):
     return db.query(AISignalFeedback).order_by(AISignalFeedback.id.desc()).all()
+
+
+# --- Comments thread (visibility-aware) ---
+
+def _filter_visible(
+    rows: list[AISignalFeedback], as_role: str, user_id: int | None
+) -> list[AISignalFeedback]:
+    out: list[AISignalFeedback] = []
+    for fb in rows:
+        v = fb.visibility or "mentor_only"
+        if v == "shared":
+            out.append(fb)
+        elif v == "mentor_only":
+            # mentor sees all mentor_only; newcomer only sees own
+            if as_role == "mentor":
+                out.append(fb)
+            elif fb.user_id is not None and user_id is not None and fb.user_id == user_id:
+                out.append(fb)
+        elif v == "private":
+            if fb.user_id is not None and user_id is not None and fb.user_id == user_id:
+                out.append(fb)
+    return out
+
+
+@router.get("/{signal_id}/comments", response_model=list[AISignalFeedbackRead])
+def list_signal_comments(
+    signal_id: int,
+    as_role: str = Query("mentor", alias="as"),
+    user_id: int | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    signal = db.query(AISignal).filter(AISignal.id == signal_id).first()
+    if not signal:
+        raise HTTPException(status_code=404, detail="AI signal not found")
+
+    rows = (
+        db.query(AISignalFeedback)
+        .filter(AISignalFeedback.signal_id == signal_id)
+        .order_by(AISignalFeedback.id.asc())
+        .all()
+    )
+    return _filter_visible(rows, as_role=as_role, user_id=user_id)
+
+
+@router.post(
+    "/{signal_id}/comments",
+    response_model=AISignalFeedbackRead,
+    status_code=201,
+)
+def create_signal_comment(
+    signal_id: int,
+    payload: AISignalFeedbackCreate,
+    db: Session = Depends(get_db),
+):
+    signal = db.query(AISignal).filter(AISignal.id == signal_id).first()
+    if not signal:
+        raise HTTPException(status_code=404, detail="AI signal not found")
+
+    feedback = AISignalFeedback(
+        signal_id=signal_id,
+        user_id=payload.user_id,
+        feedback_type=payload.feedback_type or "comment",
+        comment=payload.comment,
+        visibility=payload.visibility,
+        author_role=payload.author_role,
+    )
+    db.add(feedback)
+    db.commit()
+    db.refresh(feedback)
+    return feedback
+
+
+@router.patch(
+    "/{signal_id}/acknowledge",
+    response_model=AISignalRead,
+)
+def acknowledge_signal(
+    signal_id: int,
+    db: Session = Depends(get_db),
+):
+    signal = db.query(AISignal).filter(AISignal.id == signal_id).first()
+    if not signal:
+        raise HTTPException(status_code=404, detail="AI signal not found")
+    signal.acknowledged_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(signal)
+    return signal
+
+
+@router.post(
+    "/{signal_id}/request-plan-adjustment",
+    response_model=AISignalFeedbackRead,
+    status_code=201,
+)
+def request_plan_adjustment(
+    signal_id: int,
+    payload: AISignalFeedbackCreate,
+    db: Session = Depends(get_db),
+):
+    signal = db.query(AISignal).filter(AISignal.id == signal_id).first()
+    if not signal:
+        raise HTTPException(status_code=404, detail="AI signal not found")
+
+    feedback = AISignalFeedback(
+        signal_id=signal_id,
+        user_id=payload.user_id,
+        feedback_type="adjust_request",
+        comment=payload.comment or "Newcomer requests a plan adjustment from this signal.",
+        visibility="shared",
+        author_role="newcomer",
+    )
+    db.add(feedback)
+    db.commit()
+    db.refresh(feedback)
+    return feedback

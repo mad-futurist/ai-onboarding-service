@@ -18,6 +18,7 @@ class AISignal(Base):
 
     signal_type = Column(String(100), nullable=False, index=True)
     severity = Column(String(50), nullable=False, default="medium")
+    tone = Column(String(20), nullable=False, server_default="attention", default="attention")
     confidence = Column(Float, nullable=False, default=0.7)
     score = Column(Float, nullable=False, default=0.0)
 
@@ -48,5 +49,6 @@ class AISignal(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     last_seen_at = Column(DateTime(timezone=True), server_default=func.now())
     resolved_at = Column(DateTime(timezone=True), nullable=True)
+    acknowledged_at = Column(DateTime(timezone=True), nullable=True)
 
     newcomer = relationship("NewcomerProfile")

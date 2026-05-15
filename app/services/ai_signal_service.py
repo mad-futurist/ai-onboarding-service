@@ -394,6 +394,132 @@ def detect_repeated_source_friction(
     )
 
 
+def detect_fast_completion_signals(
+    db: Session,
+    newcomer_id: int,
+    tasks: list[OnboardingTask],
+) -> list[AISignal]:
+    """Fire a positive signal when a task moved to done quickly (proxy: ≤ 24h)."""
+    created: list[AISignal] = []
+
+    for task in tasks:
+        if task.status != "done":
+            continue
+        if not task.created_at or not task.updated_at:
+            continue
+
+        delta = task.updated_at - task.created_at
+        if delta.total_seconds() > 24 * 3600:
+            continue
+
+        already = (
+            db.query(AISignal)
+            .filter(AISignal.newcomer_id == newcomer_id)
+            .filter(AISignal.signal_type == "fast_completion")
+            .filter(AISignal.target_task_id == task.id)
+            .first()
+        )
+        if already:
+            continue
+
+        signal = AISignal(
+            newcomer_id=newcomer_id,
+            signal_type="fast_completion",
+            severity="low",
+            tone="positive",
+            confidence=0.82,
+            score=0.6,
+            title=f'Fast win: "{task.title}" completed quickly',
+            description=(
+                "Task moved to done within the first day with no blockers. "
+                "This is a positive signal — the newcomer is moving fast on this scope."
+            ),
+            evidence=(
+                f'- Task: "{task.title}" (status: done)\n'
+                f"- Created: {task.created_at.isoformat()}\n"
+                f"- Updated: {task.updated_at.isoformat()}\n"
+                f"- Elapsed: {int(delta.total_seconds() // 3600)}h"
+            ),
+            suggested_action=(
+                "Consider proposing a stretch task or pulling the next milestone forward."
+            ),
+            status="open",
+            occurrence_count=1,
+            target_scope="task",
+            target_task_id=task.id,
+            target_week_id=task.week_id,
+            last_seen_at=datetime.now(timezone.utc),
+        )
+        db.add(signal)
+        db.flush()
+        created.append(signal)
+
+    return created
+
+
+def detect_deployment_heavy_plan(
+    db: Session,
+    newcomer_id: int,
+    tasks: list[OnboardingTask],
+) -> AISignal | None:
+    """≥3 deployment-related tasks in the plan → suggest consolidating."""
+    deploy_tasks = [
+        task
+        for task in tasks
+        if question_contains_any(
+            f"{task.title or ''} {task.description or ''} {task.task_type or ''}",
+            DEPLOYMENT_KEYWORDS,
+        )
+    ]
+
+    if len(deploy_tasks) < 3:
+        return None
+
+    plan_id = deploy_tasks[0].plan_id
+
+    already = (
+        db.query(AISignal)
+        .filter(AISignal.newcomer_id == newcomer_id)
+        .filter(AISignal.signal_type == "deployment_heavy_plan")
+        .filter(AISignal.status == "open")
+        .first()
+    )
+    if already:
+        return None
+
+    evidence_lines = [
+        f"- {len(deploy_tasks)} deployment-related tasks queued in the plan.",
+    ]
+    for task in deploy_tasks[:5]:
+        evidence_lines.append(f'- Task: "{task.title}" (type: {task.task_type})')
+
+    signal = AISignal(
+        newcomer_id=newcomer_id,
+        signal_type="deployment_heavy_plan",
+        severity="medium",
+        tone="attention",
+        confidence=0.8,
+        score=0.55,
+        title="Plan looks deployment-heavy",
+        description=(
+            "The plan contains several deployment-focused tasks. "
+            "Consider consolidating to keep the onboarding ramp balanced."
+        ),
+        evidence="\n".join(evidence_lines),
+        suggested_action=(
+            f"Review the {len(deploy_tasks)} deployment tasks and consider merging "
+            "two of them into a single end-to-end exercise, freeing time for product context."
+        ),
+        status="open",
+        occurrence_count=1,
+        target_scope="plan",
+        last_seen_at=datetime.now(timezone.utc),
+    )
+    db.add(signal)
+    db.flush()
+    return signal
+
+
 def detect_signals_for_newcomer(
     db: Session,
     newcomer_id: int,
@@ -432,6 +558,18 @@ def detect_signals_for_newcomer(
             created_count += 1
         else:
             updated_count += 1
+
+    # Positive / plan-shape detectors that the scoring pipeline doesn't cover.
+    tasks = get_newcomer_tasks(db=db, newcomer_id=newcomer_id)
+
+    for positive in detect_fast_completion_signals(db, newcomer_id, tasks):
+        signals.append(positive)
+        created_count += 1
+
+    deploy_heavy = detect_deployment_heavy_plan(db, newcomer_id, tasks)
+    if deploy_heavy is not None:
+        signals.append(deploy_heavy)
+        created_count += 1
 
     db.commit()
 
