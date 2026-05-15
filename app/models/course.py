@@ -30,6 +30,7 @@ class Course(Base):
 
     title = Column(String(255), nullable=False)
     summary = Column(Text, nullable=True)
+    role_target = Column(String(255), nullable=True, index=True)
 
     status = Column(String(50), nullable=False, default="draft")
     generated_by_ai = Column(Boolean, nullable=False, default=False)

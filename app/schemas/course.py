@@ -52,6 +52,7 @@ class CourseCreate(BaseModel):
     plan_id: int | None = None
     newcomer_id: int | None = None
     mentor_id: int | None = None
+    role_target: str | None = None
     source_document_ids: list[int] | None = None
 
 
@@ -61,6 +62,7 @@ class CourseUpdate(BaseModel):
     plan_id: int | None = None
     newcomer_id: int | None = None
     mentor_id: int | None = None
+    role_target: str | None = None
     source_document_ids: list[int] | None = None
 
 
@@ -70,6 +72,7 @@ class CourseAIGenerateRequest(BaseModel):
     mentor_id: int | None = None
     newcomer_id: int | None = None
     plan_id: int | None = None
+    role_target: str | None = None
     document_ids: list[int] = Field(default_factory=list)
     lesson_count: int = 4
 
@@ -79,6 +82,7 @@ class CourseRead(BaseModel):
     plan_id: int | None
     newcomer_id: int | None
     mentor_id: int | None
+    role_target: str | None
     title: str
     summary: str | None
     status: str

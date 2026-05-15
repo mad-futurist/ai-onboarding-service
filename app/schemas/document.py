@@ -74,3 +74,16 @@ class KnowledgeBaseGroupItem(BaseModel):
 class KnowledgeBaseResponse(BaseModel):
     total: int
     groups: list[KnowledgeBaseGroupItem]
+
+
+class DocumentClassifyRequest(BaseModel):
+    content: str
+    title: str | None = None
+
+
+class DocumentClassifyResponse(BaseModel):
+    title: str
+    summary: str
+    domain: str
+    document_type: str
+    source_type: str

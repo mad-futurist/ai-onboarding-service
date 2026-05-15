@@ -60,6 +60,62 @@ class _AILessonBody(BaseModel):
     infographic_kind: str | None = None
 
 
+def _fallback_lesson_outlines(prompt_hint: str, lesson_count: int) -> list[_AILessonOutline]:
+    topic = (prompt_hint or "the onboarding topic").strip()
+    templates = [
+        (f"Understand {topic}", f"Get the essential context, vocabulary, and expected outcome for {topic}."),
+        ("Map the workflow", f"Learn the step-by-step process, key handoffs, and source materials for {topic}."),
+        ("Practice with mentor support", f"Apply {topic} in a guided task and capture questions before working alone."),
+        ("Work independently", f"Use a checklist to complete a small {topic} task with confidence."),
+    ]
+    if lesson_count > len(templates):
+        templates.extend(
+            (
+                f"Deepen topic {i + 1}",
+                f"Review a more advanced scenario for {topic} and capture remaining questions.",
+            )
+            for i in range(len(templates), lesson_count)
+        )
+    return [_AILessonOutline(title=title[:120], summary=summary) for title, summary in templates[:lesson_count]]
+
+
+def _fallback_lesson_body(lesson_title: str, lesson_summary: str, documents: list[Document]) -> _AILessonBody:
+    source_titles = [doc.title for doc in documents[:3]]
+    source_line = ", ".join(source_titles) if source_titles else "the mentor-approved onboarding materials"
+    body = (
+        f"## {lesson_title}\n\n"
+        f"{lesson_summary}\n\n"
+        "### What to learn\n\n"
+        f"- Read the relevant source material: {source_line}.\n"
+        "- Identify the terms, tools, and people involved.\n"
+        "- Write down one thing that is clear and one thing that still needs clarification.\n\n"
+        "### How to practice\n\n"
+        "- Walk through the workflow with your mentor or the recommended teammate.\n"
+        "- Try the smallest safe version of the task yourself.\n"
+        "- Compare your result with the checklist or success criteria.\n\n"
+        "### Done when\n\n"
+        "- You can explain the workflow in your own words.\n"
+        "- You know where to find the source of truth next time.\n"
+        "- You have a concrete next step or question for your mentor."
+    )
+    return _AILessonBody(body=body, summary=lesson_summary, infographic_source=None, infographic_kind=None)
+
+
+def looks_like_placeholder_lesson(title: str | None, summary: str | None, body: str | None = None) -> bool:
+    text = " ".join([title or "", summary or "", body or ""]).lower()
+    return (
+        "outline placeholder" in text
+        or "add details with the mentor" in text
+        or (title or "").strip().lower().startswith("lesson ")
+    )
+
+
+def ensure_lesson_body(lesson_title: str, lesson_summary: str, body: _AILessonBody, documents: list[Document]) -> _AILessonBody:
+    if looks_like_placeholder_lesson(lesson_title, body.summary, body.body):
+        return _fallback_lesson_body(lesson_title, lesson_summary, documents)
+    return body
+
+
 # ---------------------------------------------------------------------------
 # AI: outline a new course
 # ---------------------------------------------------------------------------
@@ -172,6 +228,7 @@ def create_ai_course(
     mentor_id: int | None = None,
     newcomer_id: int | None = None,
     plan_id: int | None = None,
+    role_target: str | None = None,
     document_ids: list[int] | None = None,
     lesson_count: int = 4,
 ) -> Course:
@@ -195,6 +252,8 @@ def create_ai_course(
         newcomer=newcomer,
         lesson_count=lesson_count,
     )
+    if not outline.lessons or any(looks_like_placeholder_lesson(ls.title, ls.summary) for ls in outline.lessons):
+        outline.lessons = _fallback_lesson_outlines(prompt_hint, lesson_count)
 
     course = Course(
         title=title or outline.title,
@@ -202,6 +261,7 @@ def create_ai_course(
         plan_id=plan_id,
         newcomer_id=newcomer_id,
         mentor_id=mentor_id,
+        role_target=role_target,
         status="draft",
         generated_by_ai=True,
         source_document_ids=document_ids or None,
@@ -216,6 +276,7 @@ def create_ai_course(
             lesson_summary=ls.summary,
             documents=documents,
         )
+        body = ensure_lesson_body(ls.title, ls.summary, body, documents)
         lesson = Lesson(
             course_id=course.id,
             index=i + 1,

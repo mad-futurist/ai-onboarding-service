@@ -1,11 +1,13 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.db.session import get_db
 from app.models.course import Course
 from app.models.lesson import Lesson
+from app.models.newcomer import NewcomerProfile
 from app.schemas.course import (
     CourseAIGenerateRequest,
     CourseCreate,
@@ -18,6 +20,7 @@ from app.schemas.course import (
 )
 from app.services.course_service import (
     ai_generate_lesson_body,
+    ensure_lesson_body,
     create_ai_course,
 )
 
@@ -29,6 +32,75 @@ def _utc_now() -> datetime:
 router = APIRouter(prefix="/courses", tags=["Courses"])
 
 
+def _normalize_role_target(value: str | None) -> str | None:
+    if not value:
+        return None
+    normalized = "_".join(value.strip().lower().split())
+    return normalized or None
+
+
+def _role_target_filter(value: str | None):
+    normalized = _normalize_role_target(value)
+    if not normalized:
+        return Course.id == -1
+    raw = (value or "").strip().lower()
+    candidates = {normalized, raw}
+    role_column = func.lower(Course.role_target)
+    clauses = []
+    for candidate in candidates:
+        if not candidate:
+            continue
+        clauses.extend(
+            [
+                role_column == candidate,
+                role_column.like(f"{candidate},%"),
+                role_column.like(f"%,{candidate}"),
+                role_column.like(f"%,{candidate},%"),
+                role_column.like(f"%, {candidate}"),
+                role_column.like(f"%, {candidate},%"),
+            ]
+        )
+    return or_(*clauses) if clauses else Course.id == -1
+
+
+def _public_course_filter():
+    return or_(
+        Course.role_target.is_(None),
+        func.lower(Course.role_target) == "all",
+    )
+
+
+def _newcomer_course_recommendation_filter(newcomer: NewcomerProfile):
+    return or_(
+        Course.newcomer_id == newcomer.id,
+        (
+            Course.newcomer_id.is_(None)
+            & _role_target_filter(newcomer.job_title)
+        ),
+    )
+
+
+def _newcomer_course_visibility_filter(newcomer: NewcomerProfile):
+    return or_(
+        _newcomer_course_recommendation_filter(newcomer),
+        (
+            Course.newcomer_id.is_(None)
+            & _public_course_filter()
+        ),
+    )
+
+
+def _is_course_visible_to_newcomer(course: Course, newcomer: NewcomerProfile) -> bool:
+    if course.status not in ("approved", "published"):
+        return False
+    if course.newcomer_id is not None:
+        return course.newcomer_id == newcomer.id
+    target = _normalize_role_target(course.role_target)
+    if target in (None, "all"):
+        return True
+    return target == _normalize_role_target(newcomer.job_title)
+
+
 # ---------------------------------------------------------------------------
 # Course CRUD
 # ---------------------------------------------------------------------------
@@ -38,16 +110,40 @@ def list_courses(
     newcomer_id: int | None = None,
     mentor_id: int | None = None,
     plan_id: int | None = None,
+    role_target: str | None = None,
     status: str | None = None,
+    include_role_matches: bool = False,
+    public_only: bool = False,
     db: Session = Depends(get_db),
 ):
     query = db.query(Course)
     if newcomer_id is not None:
-        query = query.filter(Course.newcomer_id == newcomer_id)
+        newcomer = (
+            db.query(NewcomerProfile)
+            .filter(NewcomerProfile.id == newcomer_id)
+            .first()
+        )
+        if include_role_matches:
+            if newcomer:
+                query = query.filter(_newcomer_course_recommendation_filter(newcomer))
+            else:
+                query = query.filter(Course.newcomer_id == newcomer_id)
+        else:
+            query = query.filter(Course.newcomer_id == newcomer_id)
     if mentor_id is not None:
         query = query.filter(Course.mentor_id == mentor_id)
     if plan_id is not None:
         query = query.filter(Course.plan_id == plan_id)
+    if role_target:
+        query = query.filter(
+            Course.newcomer_id.is_(None),
+            _role_target_filter(role_target),
+        )
+    if public_only:
+        query = query.filter(
+            Course.newcomer_id.is_(None),
+            _public_course_filter(),
+        )
     if status:
         query = query.filter(Course.status == status)
     return query.order_by(Course.id.desc()).all()
@@ -61,6 +157,7 @@ def create_course(payload: CourseCreate, db: Session = Depends(get_db)):
         plan_id=payload.plan_id,
         newcomer_id=payload.newcomer_id,
         mentor_id=payload.mentor_id,
+        role_target=_normalize_role_target(payload.role_target),
         source_document_ids=payload.source_document_ids,
         status="draft",
         generated_by_ai=False,
@@ -80,6 +177,7 @@ def ai_generate_course(payload: CourseAIGenerateRequest, db: Session = Depends(g
         mentor_id=payload.mentor_id,
         newcomer_id=payload.newcomer_id,
         plan_id=payload.plan_id,
+        role_target=_normalize_role_target(payload.role_target),
         document_ids=payload.document_ids,
         lesson_count=payload.lesson_count,
     )
@@ -93,7 +191,11 @@ def ai_generate_course(payload: CourseAIGenerateRequest, db: Session = Depends(g
 
 
 @router.get("/{course_id}", response_model=CourseWithLessonsRead)
-def get_course(course_id: int, db: Session = Depends(get_db)):
+def get_course(
+    course_id: int,
+    newcomer_id: int | None = None,
+    db: Session = Depends(get_db),
+):
     course = (
         db.query(Course)
         .options(joinedload(Course.lessons))
@@ -102,6 +204,14 @@ def get_course(course_id: int, db: Session = Depends(get_db)):
     )
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
+    if newcomer_id is not None:
+        newcomer = (
+            db.query(NewcomerProfile)
+            .filter(NewcomerProfile.id == newcomer_id)
+            .first()
+        )
+        if not newcomer or not _is_course_visible_to_newcomer(course, newcomer):
+            raise HTTPException(status_code=404, detail="Course not found")
     return course
 
 
@@ -111,6 +221,8 @@ def update_course(course_id: int, payload: CourseUpdate, db: Session = Depends(g
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
     for field, value in payload.model_dump(exclude_unset=True).items():
+        if field == "role_target":
+            value = _normalize_role_target(value)
         setattr(course, field, value)
     db.commit()
     db.refresh(course)
@@ -229,6 +341,7 @@ def ai_generate_lesson(
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
     body = ai_generate_lesson_body(course=course, lesson_title=lesson_title, lesson_summary=lesson_summary)
+    body = ensure_lesson_body(lesson_title, lesson_summary, body, [])
     next_index = (
         db.query(Lesson)
         .filter(Lesson.course_id == course_id)
