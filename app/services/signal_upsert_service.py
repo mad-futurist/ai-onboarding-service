@@ -37,10 +37,14 @@ def upsert_signal(
         existing_signal.severity = score_result.severity
         existing_signal.confidence = score_result.confidence
         existing_signal.score = score_result.score
+        existing_signal.tone = score_result.tone
         existing_signal.title = score_result.title
         existing_signal.description = score_result.description
         existing_signal.evidence = evidence_text
         existing_signal.suggested_action = score_result.suggested_action
+        existing_signal.target_scope = score_result.target_scope
+        existing_signal.target_week_id = score_result.target_week_id
+        existing_signal.target_task_id = score_result.target_task_id
         existing_signal.occurrence_count += 1
         existing_signal.last_seen_at = utc_now()
 
@@ -54,12 +58,16 @@ def upsert_signal(
         severity=score_result.severity,
         confidence=score_result.confidence,
         score=score_result.score,
+        tone=score_result.tone,
         title=score_result.title,
         description=score_result.description,
         evidence=evidence_text,
         suggested_action=score_result.suggested_action,
         status="open",
         occurrence_count=1,
+        target_scope=score_result.target_scope,
+        target_week_id=score_result.target_week_id,
+        target_task_id=score_result.target_task_id,
         last_seen_at=utc_now(),
     )
 

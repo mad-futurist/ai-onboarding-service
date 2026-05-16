@@ -26,6 +26,7 @@ from app.api.routes import demo
 from app.api.routes import courses
 from app.api.routes import meetings
 from app.api.routes import lesson_notes
+from app.api.routes import assessments
 
 
 app = FastAPI(title=settings.APP_NAME)
@@ -65,3 +66,4 @@ app.include_router(demo.router)
 app.include_router(courses.router)
 app.include_router(meetings.router)
 app.include_router(lesson_notes.router)
+app.include_router(assessments.router)

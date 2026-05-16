@@ -8,6 +8,7 @@ from app.models.ai_signal import AISignal
 from app.models.newcomer import NewcomerProfile
 from app.models.ai_signal_feedback import AISignalFeedback
 from app.schemas.ai_signal import (
+    AISignalCatalogGroup,
     AISignalCreate,
     AISignalDetectionResponse,
     AISignalRead,
@@ -20,9 +21,16 @@ from app.services.ai_signal_service import (
     resolve_signal,
 )
 from app.services.feature_service import compute_newcomer_features
+from app.services.signal_catalog_service import list_signal_catalog
 
 
 router = APIRouter(prefix="/ai-signals", tags=["AI Signals"])
+
+
+@router.get("/catalog", response_model=list[AISignalCatalogGroup])
+def get_signal_catalog():
+    return list_signal_catalog()
+
 
 @router.get("/features/newcomers/{newcomer_id}")
 def get_newcomer_signal_features(
@@ -62,12 +70,17 @@ def create_ai_signal(
         newcomer_id=payload.newcomer_id,
         signal_type=payload.signal_type,
         severity=payload.severity,
+        tone=payload.tone,
         confidence=payload.confidence,
+        score=payload.score,
         title=payload.title,
         description=payload.description,
         evidence=payload.evidence,
         suggested_action=payload.suggested_action,
         status="open",
+        target_scope=payload.target_scope,
+        target_week_id=payload.target_week_id,
+        target_task_id=payload.target_task_id,
     )
 
     db.add(signal)

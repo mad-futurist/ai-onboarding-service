@@ -9,6 +9,7 @@ from app.models.onboarding_plan import OnboardingPlan
 from app.models.onboarding_task import OnboardingTask
 from app.services.feature_service import compute_newcomer_features
 from app.services.signal_scoring_service import score_all_signals
+from app.services.signal_scoring_service import SignalScoreResult
 from app.services.signal_upsert_service import upsert_signal
 
 
@@ -39,6 +40,8 @@ ACCESS_KEYWORDS = [
     "credentials",
     "vpn",
 ]
+
+SignalDetection = tuple[AISignal, bool]
 
 
 def normalize_text(value: str | None) -> str:
@@ -399,7 +402,7 @@ def detect_fast_completion_signals(
     newcomer_id: int,
     tasks: list[OnboardingTask],
 ) -> list[AISignal]:
-    """Fire a positive signal when a task moved to done quickly (proxy: ≤ 24h)."""
+    """Fire a positive signal when a task moved to done quickly (proxy: <= 24h)."""
     created: list[AISignal] = []
 
     for task in tasks:
@@ -432,7 +435,7 @@ def detect_fast_completion_signals(
             title=f'Fast win: "{task.title}" completed quickly',
             description=(
                 "Task moved to done within the first day with no blockers. "
-                "This is a positive signal — the newcomer is moving fast on this scope."
+                "This is a positive signal: the newcomer is moving fast on this scope."
             ),
             evidence=(
                 f'- Task: "{task.title}" (status: done)\n'
@@ -462,7 +465,7 @@ def detect_deployment_heavy_plan(
     newcomer_id: int,
     tasks: list[OnboardingTask],
 ) -> AISignal | None:
-    """≥3 deployment-related tasks in the plan → suggest consolidating."""
+    """3 or more deployment-related tasks in the plan means suggest consolidating."""
     deploy_tasks = [
         task
         for task in tasks
@@ -520,6 +523,150 @@ def detect_deployment_heavy_plan(
     return signal
 
 
+def detect_empty_plan_blocker(
+    db: Session,
+    newcomer_id: int,
+    tasks: list[OnboardingTask],
+) -> SignalDetection | None:
+    if tasks:
+        return None
+
+    score_result = SignalScoreResult(
+        signal_type="empty_plan_blocker",
+        topic="plan",
+        score=0.95,
+        confidence=0.95,
+        severity="high",
+        tone="critical",
+        title="Missing actionable onboarding plan",
+        description=(
+            "The newcomer has no onboarding tasks. Without a concrete first plan, "
+            "progress depends on ad hoc mentor follow-up."
+        ),
+        evidence_lines=["No onboarding tasks were found for this newcomer."],
+        suggested_action=(
+            "Generate or assign a first-week plan with one setup task, one context task, "
+            "and one mentor checkpoint."
+        ),
+        target_scope="plan",
+    )
+    return upsert_signal(db=db, newcomer_id=newcomer_id, score_result=score_result)
+
+
+def detect_blocked_task_signal(
+    db: Session,
+    newcomer_id: int,
+    tasks: list[OnboardingTask],
+) -> SignalDetection | None:
+    blocked_tasks = [task for task in tasks if task.status == "blocked"]
+    if not blocked_tasks:
+        return None
+
+    evidence_lines = [f"{len(blocked_tasks)} onboarding task(s) are currently blocked."]
+    for task in blocked_tasks[:5]:
+        evidence_lines.append(f'Task: "{task.title}"')
+
+    first_task = blocked_tasks[0]
+    score_result = SignalScoreResult(
+        signal_type="blocked_task",
+        topic="task",
+        score=0.9,
+        confidence=0.9,
+        severity="high",
+        tone="critical",
+        title="Blocked onboarding task detected",
+        description=(
+            "One or more onboarding tasks are marked as blocked. "
+            "The newcomer may not be able to progress independently."
+        ),
+        evidence_lines=evidence_lines,
+        suggested_action=(
+            "Review the blocked tasks with the newcomer and decide whether to clarify "
+            "instructions, assign a helper, or adapt the onboarding plan."
+        ),
+        target_scope="task" if len(blocked_tasks) == 1 else "plan",
+        target_week_id=first_task.week_id if len(blocked_tasks) == 1 else None,
+        target_task_id=first_task.id if len(blocked_tasks) == 1 else None,
+    )
+    return upsert_signal(db=db, newcomer_id=newcomer_id, score_result=score_result)
+
+
+def detect_steady_progress_signal(
+    db: Session,
+    newcomer_id: int,
+    tasks: list[OnboardingTask],
+) -> SignalDetection | None:
+    done_tasks = [task for task in tasks if task.status == "done"]
+    blocked_tasks = [task for task in tasks if task.status == "blocked"]
+
+    if len(done_tasks) < 3 or blocked_tasks:
+        return None
+
+    score_result = SignalScoreResult(
+        signal_type="steady_progress",
+        topic="progress",
+        score=0.7,
+        confidence=0.82,
+        severity="low",
+        tone="positive",
+        title="Steady onboarding progress",
+        description=(
+            "The newcomer is completing multiple onboarding tasks without active blockers. "
+            "This is a good moment to reinforce autonomy."
+        ),
+        evidence_lines=[
+            f"{len(done_tasks)} task(s) are done.",
+            "No task is currently blocked.",
+        ],
+        suggested_action=(
+            "Keep the current pace and consider adding an optional stretch task or deeper product context."
+        ),
+        target_scope="plan",
+    )
+    return upsert_signal(db=db, newcomer_id=newcomer_id, score_result=score_result)
+
+
+def detect_plan_stall_signal(
+    db: Session,
+    newcomer_id: int,
+    tasks: list[OnboardingTask],
+) -> SignalDetection | None:
+    active_tasks = [task for task in tasks if task.status in ["todo", "in_progress"]]
+    done_tasks = [task for task in tasks if task.status == "done"]
+    blocked_tasks = [task for task in tasks if task.status == "blocked"]
+
+    if done_tasks or blocked_tasks or len(active_tasks) < 3:
+        return None
+
+    evidence_lines = [
+        f"{len(active_tasks)} task(s) are queued or in progress.",
+        "No onboarding task has been completed yet.",
+    ]
+    for task in active_tasks[:5]:
+        evidence_lines.append(f'Task: "{task.title}" ({task.status})')
+
+    score_result = SignalScoreResult(
+        signal_type="plan_stall",
+        topic="progress",
+        score=0.62,
+        confidence=0.74,
+        severity="medium",
+        tone="attention",
+        title="Plan stall risk",
+        description=(
+            "The plan has several active tasks, but none has reached done. "
+            "The newcomer may need a smaller next step."
+        ),
+        evidence_lines=evidence_lines,
+        suggested_action=(
+            "Pick one starter task with the newcomer, define the next concrete action, "
+            "and add a short mentor checkpoint."
+        ),
+        target_scope="plan",
+    )
+    return upsert_signal(db=db, newcomer_id=newcomer_id, score_result=score_result)
+
+
 def detect_signals_for_newcomer(
     db: Session,
     newcomer_id: int,
@@ -561,6 +708,21 @@ def detect_signals_for_newcomer(
 
     # Positive / plan-shape detectors that the scoring pipeline doesn't cover.
     tasks = get_newcomer_tasks(db=db, newcomer_id=newcomer_id)
+
+    for detector in (
+        detect_empty_plan_blocker,
+        detect_blocked_task_signal,
+        detect_steady_progress_signal,
+        detect_plan_stall_signal,
+    ):
+        detection = detector(db, newcomer_id, tasks)
+        if detection is not None:
+            signal, created = detection
+            signals.append(signal)
+            if created:
+                created_count += 1
+            else:
+                updated_count += 1
 
     for positive in detect_fast_completion_signals(db, newcomer_id, tasks):
         signals.append(positive)

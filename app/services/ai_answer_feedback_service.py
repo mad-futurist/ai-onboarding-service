@@ -54,13 +54,14 @@ def _check_and_trigger_signal(db: Session, newcomer_id: int) -> None:
             topic="knowledge_base",
             score=min(0.9, 0.7 + (negative_count - SIGNAL_THRESHOLD) * 0.05),
             severity="medium",
+            tone="attention",
             confidence=0.8,
             title="AI answers not meeting newcomer needs",
             description=(
                 f"The newcomer gave {negative_count} negative feedback(s) on AI answers. "
                 "This may indicate the knowledge base lacks relevant or actionable content."
             ),
-            evidence_lines=[f"- {negative_count} negative AI answer feedbacks recorded."],
+            evidence_lines=[f"{negative_count} negative AI answer feedbacks recorded."],
             suggested_action=(
                 "Review the most-used documents and improve their clarity. "
                 "Consider adding role-specific quick-reference guides."

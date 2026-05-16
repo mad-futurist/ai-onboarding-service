@@ -9,10 +9,14 @@ class SignalScoreResult:
     score: float
     confidence: float
     severity: str
+    tone: str
     title: str
     description: str
     evidence_lines: list[str]
     suggested_action: str
+    target_scope: str | None = None
+    target_week_id: int | None = None
+    target_task_id: int | None = None
 
 
 def severity_from_score(score: float) -> str:
@@ -35,6 +39,7 @@ def score_topic_friction(
 ) -> SignalScoreResult | None:
     questions_count = features["questions_by_topic_count"].get(topic, 0)
     blocked_tasks_count = features["blocked_tasks_by_topic_count"].get(topic, 0)
+    blocked_reports_count = features.get("blocked_reports_by_topic_count", {}).get(topic, 0)
 
     questions = features["questions_by_topic"].get(topic, [])
 
@@ -65,6 +70,12 @@ def score_topic_friction(
             f"{blocked_tasks_count} blocked task(s) related to {topic}."
         )
 
+    if blocked_reports_count >= 1:
+        score += 0.35
+        evidence_lines.append(
+            f"{blocked_reports_count} blocker report(s) related to {topic}."
+        )
+
     if repeated_sources:
         score += 0.2
 
@@ -83,6 +94,7 @@ def score_topic_friction(
 
     severity = severity_from_score(score)
 
+    tone = "critical" if blocked_tasks_count or blocked_reports_count or score >= 0.85 else "attention"
     signal_type = f"{topic}_friction"
 
     title_by_topic = {
@@ -127,6 +139,7 @@ def score_topic_friction(
         score=score,
         confidence=score,
         severity=severity,
+        tone=tone,
         title=title_by_topic.get(topic, f"Possible {topic} onboarding friction"),
         description=(
             f"The newcomer shows repeated friction around {topic}. "

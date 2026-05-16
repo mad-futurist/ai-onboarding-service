@@ -58,3 +58,21 @@ class AISignalStatusUpdateResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class AISignalCatalogItem(BaseModel):
+    signal_type: str
+    title: str
+    tone: str
+    severity: str
+    when: str
+    evidence: str
+    suggested_action: str
+    mvp_trigger: str
+
+
+class AISignalCatalogGroup(BaseModel):
+    tone: str
+    label: str
+    description: str
+    items: list[AISignalCatalogItem]
