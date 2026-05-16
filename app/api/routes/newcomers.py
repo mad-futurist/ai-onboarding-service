@@ -35,11 +35,12 @@ def create_newcomer(payload: NewcomerCreate, db: Session = Depends(get_db)):
     if existing_user:
         raise HTTPException(status_code=400, detail="User with this email already exists")
 
-    if payload.mentor_id:
+    mentor_id = payload.mentor_id
+    if mentor_id:
         mentor = db.query(User).filter(User.id == payload.mentor_id).first()
 
         if not mentor:
-            raise HTTPException(status_code=404, detail="Mentor not found")
+            mentor_id = None
 
     user = User(
         email=payload.email,
@@ -52,7 +53,7 @@ def create_newcomer(payload: NewcomerCreate, db: Session = Depends(get_db)):
 
     newcomer = NewcomerProfile(
         user_id=user.id,
-        mentor_id=payload.mentor_id,
+        mentor_id=mentor_id,
         job_title=payload.job_title,
         seniority=payload.seniority,
         team=payload.team,

@@ -15,6 +15,7 @@ from app.models.document import Document
 from app.models.newcomer import NewcomerProfile
 from app.models.onboarding_plan import OnboardingPlan
 from app.models.onboarding_task import OnboardingTask
+from app.models.user import User
 from app.schemas.assessment import (
     AssessmentAnswerUpdate,
     AssessmentGenerateRequest,
@@ -66,6 +67,32 @@ def _load_documents(db: Session, ids: list[int]) -> list[Document]:
     return docs
 
 
+def _normalize_generation_payload(
+    db: Session,
+    payload: AssessmentGenerateRequest,
+) -> None:
+    if payload.mentor_id is not None:
+        mentor = db.query(User).filter(User.id == payload.mentor_id).first()
+        if not mentor:
+            payload.mentor_id = None
+
+    if payload.newcomer_id:
+        newcomer = (
+            db.query(NewcomerProfile)
+            .options(joinedload(NewcomerProfile.user))
+            .filter(NewcomerProfile.id == payload.newcomer_id)
+            .first()
+        )
+        if not newcomer:
+            raise HTTPException(status_code=404, detail="Newcomer not found")
+
+        payload.job_title = payload.job_title or newcomer.job_title
+        payload.seniority = payload.seniority or newcomer.seniority
+        payload.team = payload.team or newcomer.team
+        if payload.mentor_id is None:
+            payload.mentor_id = newcomer.mentor_id
+
+
 # ----------------------------------------------------------------------
 # Generation / regeneration
 # ----------------------------------------------------------------------
@@ -76,19 +103,7 @@ def generate_assessment(
     db: Session = Depends(get_db),
 ):
     documents = _load_documents(db, payload.document_ids)
-
-    # Optionally enrich with newcomer profile if id was provided
-    if payload.newcomer_id:
-        newcomer = (
-            db.query(NewcomerProfile)
-            .options(joinedload(NewcomerProfile.user))
-            .filter(NewcomerProfile.id == payload.newcomer_id)
-            .first()
-        )
-        if newcomer:
-            payload.job_title = payload.job_title or newcomer.job_title
-            payload.seniority = payload.seniority or newcomer.seniority
-            payload.team = payload.team or newcomer.team
+    _normalize_generation_payload(db, payload)
 
     result = generate_assessment_with_ai(payload, documents)
     assessment = persist_generated_assessment(db, payload, result)
