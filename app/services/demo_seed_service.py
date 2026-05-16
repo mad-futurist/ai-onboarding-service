@@ -1,13 +1,26 @@
+from __future__ import annotations
+
+from datetime import date, datetime, timedelta, timezone
+
 from sqlalchemy.orm import Session
 
 from app.models.ai_answer_feedback import AIAnswerFeedback
 from app.models.ai_question import AIQuestion, AIQuestionSource
 from app.models.ai_signal import AISignal
 from app.models.ai_signal_feedback import AISignalFeedback
+from app.models.assessment import (
+    Assessment,
+    AssessmentAnswer,
+    AssessmentQuestion,
+    AssessmentSubmission,
+)
 from app.models.blocked_report import BlockedReport
 from app.models.company_onboarding_gap import CompanyOnboardingGap
+from app.models.course import Course
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
+from app.models.lesson import Lesson
+from app.models.lesson_note import LessonNote
 from app.models.mentor_digest import MentorDigest
 from app.models.newcomer import NewcomerProfile
 from app.models.onboarding_event import OnboardingEvent
@@ -17,21 +30,268 @@ from app.models.onboarding_task import OnboardingTask
 from app.models.person_contact import NewcomerRecommendedContact, PersonContact
 from app.models.plan_adjustment import PlanAdjustmentSuggestion
 from app.models.progress_snapshot import ProgressSnapshot
+from app.models.scheduled_meeting import ScheduledMeeting
+from app.models.sprint import Sprint
 from app.models.user import User
+from app.models.week import Week
 from app.services.rag_service import generate_chunks_for_document
 
 
-DOCUMENTS = [
+SALES_REGULATION = """
+Регламент роботи відділу продажів у 2026 році.
+
+Мета процесу: перетворити холодного ліда у платного клієнта через структурований
+цикл продажів із залученням маркетолога та спеціалістів.
+
+Етап 1 — Лідогенерація та первинний контакт:
+- менеджер здійснює холодні контакти відповідно до KPI;
+- визначає, чи лід контактний та релевантний;
+- якщо лід зацікавлений, пропонує короткий дзвінок-опитування на 15-20 хв.
+
+Етап 2 — Діагностичний дзвінок:
+- провести коротке інтерв'ю;
+- зібрати бриф: цілі, стан бізнесу, бюджет, проблеми;
+- визначити потенціал клієнта;
+- систематизувати інформацію і передати маркетологу.
+
+Етап 3 — Комерційна пропозиція:
+- маркетолог або CEO Аня разом із профільним спеціалістом аналізує бриф;
+- команда формує структуру рішення, пакет послуг, ціну і КП;
+- менеджер отримує готову пропозицію для презентації.
+
+Етап 4 — Презентація КП:
+- менеджер домовляється про зідзвон і веде зустріч;
+- маркетолог або спеціаліст підстраховує технічні питання;
+- менеджер фіксує реакції, питання, заперечення і наступний крок.
+
+Етап 5 — Закриття угоди:
+- довести клієнта до фінального рішення;
+- уточнити остаточні умови і вартість;
+- передати дані для договору і рахунку;
+- контролювати підписання договору і оплату. Оплату підтверджує CEO Аня.
+
+Етап 6 — Передача в продакшн:
+- організувати стартову зустріч з клієнтом, PM, маркетологом і спеціалістом;
+- фіналізувати очікування, задачі, дедлайни і відповідальних.
+
+KPI активності на день:
+- Facebook: 25-30 повідомлень;
+- Instagram: 25-30 повідомлень;
+- Freelancehunt: 10-15 контактів;
+- LinkedIn: 5-8 контактів;
+- Telegram: 8-10 контактів;
+- Email: 10-15 листів;
+- 20-30 активних діалогів на день;
+- 6-10 дзвінків на тиждень;
+- 4+ заповнених брифів на тиждень;
+- 4-6 КП або презентацій на тиждень.
+
+KPI результату на місяць:
+- мінімум 2 угоди;
+- 3-4 угоди — нормальний результат;
+- 5+ угод — відмінний результат;
+- конверсія з брифу в угоду не нижче 20-30%.
+
+Звітність:
+- щоденний звіт: повідомлення по каналах, відповіді, активні діалоги;
+- щотижневий звіт: дзвінки, брифи, презентації, КП, угоди.
+""".strip()
+
+
+SALES_SKILLS = """
+Що має вміти менеджер з продажів.
+
+Менеджер повинен розуміти повний цикл продажу: пошук потенційних клієнтів,
+переговори, укладання угоди, підтримка довгострокових відносин.
+
+Hard skills:
+- холодні дзвінки, email-маркетинг, воронка продажів;
+- знання послуг агентства: SMM, таргетована реклама Meta/TikTok/LinkedIn,
+  Google Ads, дизайн;
+- техніки SPIN, AIDA, робота із запереченнями;
+- CAC, ROI, конверсія, середній чек, LTV;
+- Google Analytics, Data Studio, Excel;
+- комерційні пропозиції і фінальні звіти;
+- прогнозування доходів і маржинальності;
+- LinkedIn Sales Navigator, Hunter.io та інші платформи;
+- переговори, договори, складні ситуації.
+
+Soft skills:
+- тайм-менеджмент і багатозадачність;
+- переконання і переговори;
+- просте пояснення складних речей;
+- вирішення конфліктів;
+- емпатія до клієнтів та колег;
+- стресостійкість;
+- адаптація до змін;
+- креативність у залученні клієнтів.
+""".strip()
+
+
+SALES_JOB_DESCRIPTION = """
+Посадова інструкція менеджера з продажів та роботи з клієнтами.
+
+Підпорядкування: заступнику директора.
+Місце роботи: відділ продажів та роботи з клієнтами, віддалений формат.
+
+Основні обов'язки:
+- активний пошук клієнтів через холодні дзвінки, email, соціальні мережі,
+  фріланс-біржі і нетворкінг;
+- вивчення ринку та конкурентів;
+- первинні переговори;
+- формування комерційних пропозицій відповідно до потреб клієнтів;
+- високий рівень комунікації на всіх етапах співпраці;
+- збір і аналіз зворотного зв'язку;
+- регулярні звіти про продажі, цілі і виконання планів;
+- співпраця з маркетингом для узгодження просування.
+
+Права:
+- вимагати інформацію, необхідну для виконання обов'язків;
+- пропонувати покращення процесів продажу;
+- приймати рішення щодо КП у межах стандартів.
+
+Вимоги:
+- вища освіта у сфері економіки, менеджменту або маркетингу;
+- 1-2 роки досвіду у продажах або клієнтському сервісі;
+- переговори, переконання, CRM, основи маркетингу.
+
+Кінцевий продукт: нові підписані контракти, задоволені клієнти,
+виконані плани продажів.
+""".strip()
+
+
+DAILY_KPI_TEMPLATE = """
+Щоденка задачі: шаблон для Sales Manager.
+
+План на день:
+- ставки на Freelancehunt: 20;
+- розсилка Instagram: 30;
+- розсилка Facebook: 40;
+- Email: 20;
+- LinkedIn: 10;
+- Telegram: 5;
+- всього контактів: 125.
+
+Репости:
+- Instagram Trends: 1;
+- Threads/Trends: 1;
+- Facebook groups: 1.
+
+Таблиця KPI має містити план і факт по кожному джерелу лідів:
+Freelancehunt, Instagram, Facebook, Email, LinkedIn, Telegram, репости.
+Щодня менеджер вносить факт, посилання на репости і короткий коментар
+по якості діалогів.
+""".strip()
+
+
+PRODUCT_DEFINITION = """
+PRODUCT DEFINITION v3: AI Sales Onboarding Agent.
+
+Ідея: AI-система визначає готовність sales-спеціаліста до роботи:
+веде новачка від визначення рівня через персоналізоване навчання до
+підтвердження готовності працювати з реальними лідами.
+
+Відмінність від конкурентів:
+- LMS навчають, але не підтверджують готовність;
+- HRM керують процесами, але не тренують рольові навички;
+- Sales Analytics аналізують результат, але не ведуть онбординг.
+
+Наш підхід:
+- тест при першому вході;
+- персоналізований план навчання під роль і рівень;
+- AI-чат з відповідями з внутрішніх документів;
+- моніторинг прогресу без відчуття стеження;
+- підтвердження готовності до реальної роботи.
+
+MVP:
+- BDR Марина і ментор Олег як основний сценарій;
+- тест при вході;
+- 30/60/90 план;
+- RAG-чат;
+- завантаження документів;
+- картки прогресу;
+- дайджест для ментора.
+
+Базова корисна база знань:
+основи продажів, холодні ліди, теплі ліди, етапи продажу, скрипти,
+заперечення, follow-up, кваліфікація, CRM-дисципліна, KPI, розвиток
+від junior до middle і senior.
+""".strip()
+
+
+SALES_PRACTICE_LIBRARY = """
+Практична база: заперечення, кейси, AI-клієнти.
+
+Заперечення:
+1. "Це дорого для нас зараз." Відповідь: порівняйте ціну продукту з вартістю
+поточної проблеми. Якщо Head of Sales витрачає 8 год/тиждень по $50/год,
+це $1600 за місяць на одного новачка.
+2. "Зараз не кращий час." Відповідь: запитайте, чи планують наймати Sales
+цього кварталу. Якщо так, кожен тиждень затримки коштує часу ментора.
+3. "Ми вже використовуємо Notion." Відповідь: Notion зберігає знання, але не
+перевіряє засвоєння і не дає рольову практику.
+4. "AI не замінить ментора." Відповідь: AI не замінює ментора, а бере рутину:
+повторення базових питань, тестування знань, практика стандартних заперечень.
+5. "Нам потрібен пілот." Відповідь: одразу визначити команду, метрики успіху
+і термін 4 або 6 тижнів.
+
+Кейси:
+- Finteco: Head of Sales витрачав 10+ год/тиждень на новачка; ROI у годинах
+ментора допоміг закрити річний контракт.
+- TechSales UA: HR Director купила не "онбординг", а інструмент зменшення
+плинності нових Sales.
+- RetailGroup: угоду програли через внутрішній IT-проєкт, який не виявили.
+- StartupX: proposal був занадто дорогим для seed-стадії.
+- SalesForce UA: повернення після "не зараз" спрацювало, коли з'явився
+тригер найму.
+
+AI-клієнти:
+- Олексій Коваль, Head of Sales: прагматик, говорить цифрами, питає ROI.
+- Наталя Мороз, HR Director: турбується про employee experience.
+- Дмитро Савченко, COO: питає про масштабування, безпеку, інтеграції.
+- Аліна Лисенко, CEO: швидко вирішує, але не має часу на складний запуск.
+""".strip()
+
+
+SALES_FOUNDATIONS = """
+Основи продажів для Sales Manager.
+
+Холодний лід — людина або компанія, яка ще не проявила явного інтересу.
+Мета першого контакту: не продати одразу, а отримати відповідь і короткий
+діагностичний дзвінок.
+
+Теплий лід — контакт, який відповів, залишив заявку або взаємодіяв з контентом.
+Для теплого ліда важливо швидко уточнити потребу, контекст, бюджет і наступний крок.
+
+Кваліфікація:
+- проблема;
+- роль людини у прийнятті рішення;
+- бюджет або діапазон;
+- дедлайн;
+- поточне рішення;
+- наступний крок.
+
+Follow-up:
+- перший follow-up через 24 години після контакту;
+- другий через 2-3 дні з додатковою цінністю;
+- третій через 5-7 днів з простим питанням про релевантність;
+- після зустрічі завжди фіксувати summary, домовленості і дату наступного кроку.
+
+Розвиток:
+- junior: виконує скрипт і KPI під контролем;
+- middle: самостійно веде цикл до КП;
+- senior: працює зі складними угодами, покращує процес і навчає інших.
+""".strip()
+
+
+BACKEND_DOCUMENTS = [
     {
         "title": "Company Handbook",
         "content": (
-            "Welcome to TechCorp! This handbook covers our culture, values, and key policies.\n\n"
-            "Core values: ownership, collaboration, continuous learning.\n\n"
-            "Working hours: flexible, core hours 10:00-16:00.\n\n"
-            "Communication: Slack for async, Google Meet for sync. Always default to async.\n\n"
-            "Vacation policy: 20 days/year, request via HR portal at least 2 weeks in advance.\n\n"
-            "Sick leave: notify your manager and HR same day. No limit for genuine illness.\n\n"
-            "Pointage: log hours in Jira daily, submit weekly timesheet by Friday 17:00."
+            "Welcome to TechCorp. Core values: ownership, collaboration, continuous learning.\n"
+            "Working hours are flexible with core hours 10:00-16:00. Slack is async, Google Meet is sync.\n"
+            "Vacation: 20 days/year, request through HR portal at least 2 weeks in advance.\n"
+            "Pointage: log hours in Jira daily and submit weekly timesheet Friday 17:00."
         ),
         "source": "HR",
         "document_type": "handbook",
@@ -42,13 +302,10 @@ DOCUMENTS = [
     {
         "title": "Payments Team Architecture Overview",
         "content": (
-            "The Payments team owns the payment processing microservices.\n\n"
-            "Main services: payment-gateway, fraud-detection, settlement-service, reconciliation-service.\n\n"
-            "Tech stack: Python (FastAPI), PostgreSQL, Redis, Kafka.\n\n"
-            "All services communicate via Kafka events. REST APIs are only for external clients.\n\n"
-            "Deployment: Kubernetes on AWS EKS. Each service has its own Docker image.\n\n"
-            "Code review: minimum 2 approvals required. Tech lead approval mandatory for payment-gateway changes.\n\n"
-            "On-call: rotating weekly. See PagerDuty for current on-call schedule."
+            "Payments owns payment-gateway, fraud-detection, settlement-service, reconciliation-service.\n"
+            "Tech stack: Python FastAPI, PostgreSQL, Redis, Kafka, Kubernetes on AWS EKS.\n"
+            "Services communicate via Kafka events. REST APIs are only for external clients.\n"
+            "Tech lead approval is mandatory for payment-gateway changes."
         ),
         "source": "Engineering",
         "document_type": "architecture",
@@ -59,16 +316,10 @@ DOCUMENTS = [
     {
         "title": "Deployment Guide",
         "content": (
-            "How to deploy to staging and production.\n\n"
-            "Step 1: Merge PR after 2 approvals.\n"
-            "Step 2: CI pipeline runs automatically. Check GitHub Actions for status.\n"
-            "Step 3: After CI passes, staging deploy triggers automatically.\n"
-            "Step 4: Verify your changes on staging.payments.techcorp.internal\n"
-            "Step 5: For production deploy, post in #deploys: 'Deploying payment-gateway v1.2.3'\n"
-            "Step 6: Run: kubectl rollout status deployment/payment-gateway -n payments\n"
-            "Step 7: Monitor Grafana dashboard for 15 minutes after production deploy.\n"
-            "Step 8: If issues arise, rollback: kubectl rollout undo deployment/payment-gateway -n payments\n\n"
-            "Contacts: Victor (DevOps) for infrastructure issues, Marko (Tech Lead) for release approval."
+            "Deployment flow: merge PR after 2 approvals, CI runs automatically, staging deploys after CI passes.\n"
+            "Verify on staging.payments.techcorp.internal. For production, post in #deploys, run kubectl rollout status,\n"
+            "monitor Grafana for 15 minutes, rollback with kubectl rollout undo if needed.\n"
+            "Victor handles infrastructure; Oleg gives release approval."
         ),
         "source": "Engineering",
         "document_type": "guide",
@@ -79,21 +330,9 @@ DOCUMENTS = [
     {
         "title": "Code Review Checklist",
         "content": (
-            "Before opening a PR:\n"
-            "[ ] All tests pass locally\n"
-            "[ ] No print/debug statements left\n"
-            "[ ] New code has unit tests\n"
-            "[ ] API changes are documented in OpenAPI spec\n"
-            "[ ] Database migrations are reversible\n\n"
-            "PR description must include:\n"
-            "- What this PR does\n"
-            "- How to test it\n"
-            "- Link to Jira ticket\n\n"
-            "Review process:\n"
-            "1. Author posts PR in #payments-reviews Slack channel\n"
-            "2. Reviewers have 24h to review\n"
-            "3. Address all comments before merging\n"
-            "4. Tech lead approves last for payment-critical changes"
+            "Before opening a PR: all tests pass, no debug statements, unit tests added, API changes documented,\n"
+            "migrations reversible. PR description includes what changed, how to test, and Jira link.\n"
+            "Reviewers have 24h; address comments before merging; tech lead approves payment-critical changes last."
         ),
         "source": "Engineering",
         "document_type": "checklist",
@@ -104,54 +343,382 @@ DOCUMENTS = [
     {
         "title": "Jira Workflow Guide",
         "content": (
-            "How we use Jira in the Payments team.\n\n"
-            "Ticket statuses: Backlog → To Do → In Progress → In Review → Done\n\n"
-            "Sprint planning: every 2 weeks on Monday.\n\n"
-            "Daily standup: async in #payments-standup Slack, post by 10:00.\n\n"
-            "Story points: 1=hours, 2=half day, 3=1 day, 5=2-3 days, 8=week.\n\n"
-            "When taking a ticket: assign to yourself and move to In Progress.\n"
-            "When opening PR: move ticket to In Review and link PR.\n"
-            "When merged: move ticket to Done.\n\n"
-            "Bug reports: use the Bug template in Jira. Add reproduction steps and logs."
+            "Ticket statuses: Backlog, To Do, In Progress, In Review, Done. Sprint planning every 2 weeks Monday.\n"
+            "Daily standup is async in #payments-standup by 10:00. Assign ticket before work, move to In Review when PR opens,\n"
+            "move to Done after merge. Bugs require reproduction steps and logs."
         ),
         "source": "Engineering",
         "document_type": "guide",
         "domain": "process",
-        "role_target": "all",
+        "role_target": "backend_developer",
         "scope": "team",
     },
 ]
 
-DOCUMENTS = DOCUMENTS[:4]
+
+SALES_DOCUMENTS = [
+    {
+        "title": "Регламент роботи відділу продажів 2026",
+        "content": SALES_REGULATION,
+        "source": "Sales Ops",
+        "document_type": "policy",
+        "domain": "sales",
+        "role_target": "sales_manager",
+        "scope": "team",
+    },
+    {
+        "title": "Що має вміти Sales Manager",
+        "content": SALES_SKILLS,
+        "source": "Sales Enablement",
+        "document_type": "reference",
+        "domain": "sales",
+        "role_target": "sales_manager",
+        "scope": "role",
+    },
+    {
+        "title": "Посадова інструкція менеджера з продажів",
+        "content": SALES_JOB_DESCRIPTION,
+        "source": "HR",
+        "document_type": "handbook",
+        "domain": "hr",
+        "role_target": "sales_manager",
+        "scope": "role",
+    },
+    {
+        "title": "Щоденка задачі Sales KPI",
+        "content": DAILY_KPI_TEMPLATE,
+        "source": "Sales Ops",
+        "document_type": "checklist",
+        "domain": "sales",
+        "role_target": "sales_manager",
+        "scope": "team",
+    },
+    {
+        "title": "Product Definition v3 - AI Sales Onboarding Agent",
+        "content": PRODUCT_DEFINITION,
+        "source": "Product",
+        "document_type": "reference",
+        "domain": "product",
+        "role_target": "all",
+        "scope": "enterprise",
+    },
+    {
+        "title": "Sales Objections, Cases and AI Clients",
+        "content": SALES_PRACTICE_LIBRARY,
+        "source": "Sales Enablement",
+        "document_type": "playbook",
+        "domain": "sales",
+        "role_target": "sales_manager",
+        "scope": "role",
+    },
+    {
+        "title": "Sales Foundations: Leads, Follow-up, CRM",
+        "content": SALES_FOUNDATIONS,
+        "source": "Sales Enablement",
+        "document_type": "guide",
+        "domain": "sales",
+        "role_target": "sales_manager",
+        "scope": "role",
+    },
+]
+
 
 PEOPLE = [
-    {"full_name": "Marko Ivanov", "role": "Tech Lead", "team": "Payments", "email": "marko@techcorp.com", "topics": ["code_review", "architecture", "deployment", "release_approval"]},
-    {"full_name": "Victor Petrenko", "role": "DevOps Engineer", "team": "Infrastructure", "email": "victor@techcorp.com", "topics": ["deployment", "kubernetes", "docker", "infrastructure", "staging"]},
-    {"full_name": "Julia Kovalenko", "role": "HR Manager", "team": "HR", "email": "julia@techcorp.com", "topics": ["hr_process", "vacation", "pointage", "sick_leave", "onboarding"]},
-    {"full_name": "Ana Shevchenko", "role": "QA Engineer", "team": "Payments", "email": "ana@techcorp.com", "topics": ["testing", "qa", "test_automation", "bug_reporting"]},
+    {"full_name": "Oleg Bondarenko", "role": "Head of Sales", "team": "Sales", "email": "oleg@orynt.demo", "topics": ["sales_onboarding", "kpi", "objections", "crm"]},
+    {"full_name": "Natalia Moroz", "role": "HR Director", "team": "People", "email": "natalia@orynt.demo", "topics": ["employee_experience", "retention", "onboarding_quality"]},
+    {"full_name": "Victor Petrenko", "role": "DevOps Engineer", "team": "Infrastructure", "email": "victor@orynt.demo", "topics": ["deployment", "kubernetes", "staging", "rollback"]},
+    {"full_name": "Katia Shevchenko", "role": "Senior AE", "team": "Sales", "email": "katia@orynt.demo", "topics": ["demo", "pricing", "competitive_intel", "enterprise_deals"]},
+    {"full_name": "Ana Kovalenko", "role": "QA Engineer", "team": "Payments", "email": "ana@orynt.demo", "topics": ["testing", "qa", "bug_reporting"]},
 ]
 
-PLAN_TASKS = [
-    # Week 1
-    {"title": "Set up local development environment", "description": "Clone repos, install dependencies, run the app locally", "week_number": 1, "task_type": "setup", "priority": "high", "status": "done"},
-    {"title": "Read Payments architecture overview", "description": "Understand the main services, tech stack, and data flow", "week_number": 1, "task_type": "reading", "priority": "high", "status": "done"},
-    {"title": "Join Slack channels and Jira", "description": "#payments, #deploys, #payments-reviews, #payments-standup", "week_number": 1, "task_type": "access", "priority": "high", "status": "done"},
-    {"title": "Meet Marko Ivanov (Tech Lead)", "description": "30-min intro meeting to understand team priorities", "week_number": 1, "task_type": "meeting", "priority": "medium", "status": "done"},
-    {"title": "Read Company Handbook", "description": "HR policies, vacation, pointage, values", "week_number": 1, "task_type": "reading", "priority": "medium", "status": "done"},
-    # Week 2
-    {"title": "Read Code Review Checklist", "description": "Understand PR expectations before opening first PR", "week_number": 2, "task_type": "reading", "priority": "high", "status": "done"},
-    {"title": "Pick first backend ticket from Jira", "description": "Good-first-issue in the payment-gateway service", "week_number": 2, "task_type": "development", "priority": "high", "status": "in_progress"},
-    {"title": "Open first PR", "description": "Fix or small feature in payment-gateway", "week_number": 2, "task_type": "development", "priority": "high", "status": "in_progress"},
-    {"title": "Understand deployment flow", "description": "Read deployment guide, understand staging and production process", "week_number": 2, "task_type": "deployment", "priority": "high", "status": "blocked"},
-    {"title": "Shadow a production deployment", "description": "Watch Victor or Marko do a real deploy", "week_number": 2, "task_type": "deployment", "priority": "medium", "status": "todo"},
+
+MARINA_TASKS = [
+    {"week": 1, "day": 1, "title": "Complete day-1 sales readiness assessment", "description": "Answer questions on ICP, outreach, CRM and objection handling.", "type": "assessment", "status": "done", "priority": "high"},
+    {"week": 1, "day": 2, "title": "Read sales process and KPI regulation", "description": "Understand lead generation, diagnostic calls, proposal flow, and daily activity norms.", "type": "reading", "status": "done", "priority": "high"},
+    {"week": 1, "day": 3, "title": "Write first cold outreach sequence", "description": "Draft three short messages for Facebook, Instagram and LinkedIn using the company ICP.", "type": "outreach", "status": "done", "priority": "high"},
+    {"week": 1, "day": 4, "title": "Log daily KPI table accurately", "description": "Fill plan/fact for every source and attach repost links.", "type": "crm", "status": "blocked", "priority": "high"},
+    {"week": 2, "day": 1, "title": "Run objection role-play: too expensive", "description": "Practice moving from price to cost of current problem.", "type": "role_play", "status": "in_progress", "priority": "high"},
+    {"week": 2, "day": 2, "title": "Prepare diagnostic call brief", "description": "Use problem, budget, decision role, deadline and current solution fields.", "type": "discovery", "status": "todo", "priority": "medium"},
+    {"week": 2, "day": 3, "title": "Create follow-up cadence for warm leads", "description": "Draft 24h, 3-day and 7-day follow-ups with value add.", "type": "follow_up", "status": "todo", "priority": "medium"},
+    {"week": 3, "day": 1, "title": "Shadow Katia on a proposal presentation", "description": "Watch how a senior seller handles objections and confirms next steps.", "type": "shadowing", "status": "todo", "priority": "medium"},
 ]
 
-AI_QUESTIONS = [
-    {"question": "How do I deploy my changes to staging?", "answer": "To deploy to staging: 1) Merge your PR after 2 approvals. 2) CI pipeline triggers automatically. 3) After CI passes, staging deploys automatically to staging.payments.techcorp.internal. 4) Verify your changes there. For more details, see the Deployment Guide."},
-    {"question": "Who approves the production deployment?", "answer": "Production deployments require notification in the #deploys Slack channel. Marko Ivanov (Tech Lead) gives final approval for payment-gateway changes. Victor Petrenko (DevOps) handles the infrastructure side."},
-    {"question": "What is the rollback process if something goes wrong after deploy?", "answer": "If issues arise after a production deploy, run: kubectl rollout undo deployment/payment-gateway -n payments. Then monitor the Grafana dashboard and notify the team in #deploys. Victor (DevOps) can assist with infrastructure issues."},
-    {"question": "How do I check if the staging pipeline passed?", "answer": "Check GitHub Actions in your PR for CI/CD status. The staging deploy is automatic after CI passes. You can verify on staging.payments.techcorp.internal. If the pipeline is red, check the Actions logs for the failing step."},
+
+TANYA_TASKS = [
+    {"week": 1, "day": 1, "title": "Set up local development environment", "description": "Clone repos, install dependencies, run backend tests locally.", "type": "setup", "status": "done", "priority": "high"},
+    {"week": 1, "day": 2, "title": "Trace payment-gateway request flow", "description": "Follow one external API call through FastAPI, Kafka and PostgreSQL.", "type": "architecture", "status": "done", "priority": "high"},
+    {"week": 1, "day": 3, "title": "Read code review checklist", "description": "Map every checklist item to the first PR draft.", "type": "reading", "status": "done", "priority": "medium"},
+    {"week": 2, "day": 1, "title": "Open first backend PR", "description": "Fix a small payment-gateway validation issue and request two reviews.", "type": "development", "status": "in_progress", "priority": "high"},
+    {"week": 2, "day": 2, "title": "Resolve PR comments", "description": "Address API docs, unit tests and migration questions.", "type": "code_review", "status": "in_progress", "priority": "high"},
+    {"week": 2, "day": 4, "title": "Prepare staging deployment checklist", "description": "Explain deploy, monitor and rollback steps before touching production.", "type": "deployment", "status": "todo", "priority": "high"},
+    {"week": 3, "day": 1, "title": "Shadow production deployment", "description": "Join Victor for rollout status, Grafana monitoring and rollback drill.", "type": "deployment", "status": "todo", "priority": "medium"},
+    {"week": 3, "day": 3, "title": "Document first PR learning notes", "description": "Capture architecture notes and gotchas for the next newcomer.", "type": "documentation", "status": "todo", "priority": "medium"},
 ]
+
+
+def _full_name(newcomer: NewcomerProfile) -> str:
+    return newcomer.user.full_name if newcomer.user else f"Newcomer #{newcomer.id}"
+
+
+def _persona(role: str, user: User, newcomer: NewcomerProfile | None = None) -> dict:
+    return {
+        "role": role,
+        "user_id": user.id,
+        "newcomer_id": newcomer.id if newcomer else None,
+        "name": user.full_name,
+        "email": user.email,
+        "job_title": newcomer.job_title if newcomer else user.role,
+        "team": newcomer.team if newcomer else "Sales",
+    }
+
+
+def _seed_response(
+    db: Session,
+    *,
+    already_seeded: bool = False,
+    documents_created: int = 0,
+    tasks_created: int = 0,
+    questions_created: int = 0,
+    meetings_created: int = 0,
+    signals_created: int = 0,
+    blocked_reports_created: int = 0,
+) -> dict:
+    mentor = (
+        db.query(User)
+        .filter(User.role == "mentor")
+        .order_by(User.id.asc())
+        .first()
+    )
+    newcomers = (
+        db.query(NewcomerProfile)
+        .join(User, NewcomerProfile.user_id == User.id)
+        .order_by(NewcomerProfile.id.asc())
+        .all()
+    )
+    default_newcomer = newcomers[0] if newcomers else None
+    personas = []
+    if mentor:
+        personas.append(_persona("mentor", mentor))
+    for newcomer in newcomers:
+        if newcomer.user:
+            personas.append(_persona("newcomer", newcomer.user, newcomer))
+    first_signal = db.query(AISignal).order_by(AISignal.id.asc()).first()
+    first_plan = db.query(OnboardingPlan).order_by(OnboardingPlan.id.asc()).first()
+    return {
+        "already_seeded": already_seeded,
+        "mentor_id": mentor.id if mentor else None,
+        "newcomer_id": default_newcomer.id if default_newcomer else None,
+        "newcomer_user_id": default_newcomer.user_id if default_newcomer else None,
+        "newcomer_ids": [n.id for n in newcomers],
+        "personas": personas,
+        "plan_id": first_plan.id if first_plan else None,
+        "signal_id": first_signal.id if first_signal else None,
+        "documents_created": documents_created,
+        "tasks_created": tasks_created,
+        "questions_created": questions_created,
+        "meetings_created": meetings_created,
+        "signals_created": signals_created,
+        "blocked_reports_created": blocked_reports_created,
+    }
+
+
+def _create_documents(db: Session) -> list[Document]:
+    docs: list[Document] = []
+    for doc_data in [*SALES_DOCUMENTS, *BACKEND_DOCUMENTS]:
+        doc = Document(source_type="text", external_url=None, **doc_data)
+        db.add(doc)
+        docs.append(doc)
+    db.commit()
+    for doc in docs:
+        db.refresh(doc)
+        try:
+            generate_chunks_for_document(db=db, document=doc)
+        except Exception:
+            db.rollback()
+    return docs
+
+
+def _first_chunk(db: Session, document: Document | None) -> DocumentChunk | None:
+    if not document:
+        return None
+    return (
+        db.query(DocumentChunk)
+        .filter(DocumentChunk.document_id == document.id)
+        .order_by(DocumentChunk.chunk_index.asc(), DocumentChunk.id.asc())
+        .first()
+    )
+
+
+def _find_doc(docs: list[Document], text: str) -> Document | None:
+    text_lower = text.lower()
+    return next((doc for doc in docs if text_lower in doc.title.lower()), None)
+
+
+def _create_plan(
+    db: Session,
+    *,
+    newcomer: NewcomerProfile,
+    mentor: User,
+    title: str,
+    description: str,
+    goal: str,
+    tasks: list[dict],
+) -> tuple[OnboardingPlan, list[OnboardingTask]]:
+    today = date.today()
+    plan = OnboardingPlan(
+        newcomer_id=newcomer.id,
+        mentor_id=mentor.id,
+        title=title,
+        description=description,
+        period_label="First 30 days",
+        period_start=today,
+        period_end=today + timedelta(days=30),
+        goal=goal,
+        status="active",
+        generated_by_ai=True,
+        mentor_approved=True,
+    )
+    db.add(plan)
+    db.flush()
+
+    sprint = Sprint(
+        plan_id=plan.id,
+        index=1,
+        title="Days 1-30 ramp",
+        description=goal,
+        start_day=1,
+        end_day=30,
+    )
+    db.add(sprint)
+    db.flush()
+
+    weeks: dict[int, Week] = {}
+    for week_index in sorted({item["week"] for item in tasks}):
+        week = Week(
+            plan_id=plan.id,
+            sprint_id=sprint.id,
+            index=week_index,
+            title=f"Week {week_index}",
+            summary=f"Week {week_index} focus for {_full_name(newcomer)}",
+            goals=[item["title"] for item in tasks if item["week"] == week_index][:3],
+        )
+        db.add(week)
+        db.flush()
+        weeks[week_index] = week
+
+    created: list[OnboardingTask] = []
+    for item in tasks:
+        week = weeks[item["week"]]
+        task = OnboardingTask(
+            plan_id=plan.id,
+            week_id=week.id,
+            sprint_id=sprint.id,
+            title=item["title"],
+            description=item["description"],
+            week_number=item["week"],
+            day_number=item["day"],
+            task_type=item["type"],
+            status=item["status"],
+            priority=item["priority"],
+            success_criteria=item.get("success_criteria") or f"Done when {_full_name(newcomer).split()[0]} can explain and apply this without mentor prompting.",
+            acceptance_criteria=item.get("acceptance_criteria"),
+            examples=item.get("examples"),
+            links=item.get("links"),
+        )
+        db.add(task)
+        db.flush()
+        created.append(task)
+        db.add(
+            OnboardingEvent(
+                newcomer_id=newcomer.id,
+                user_id=newcomer.user_id,
+                event_type="task_status_changed",
+                entity_type="onboarding_task",
+                entity_id=task.id,
+                topic=task.task_type,
+                metadata_json={"task_title": task.title, "status": task.status},
+            )
+        )
+    return plan, created
+
+
+def _create_ai_question(
+    db: Session,
+    *,
+    newcomer: NewcomerProfile,
+    question: str,
+    answer: str,
+    source_doc: Document | None,
+) -> AIQuestion:
+    ai_question = AIQuestion(
+        user_id=newcomer.user_id,
+        newcomer_id=newcomer.id,
+        question=question,
+        answer=answer,
+        status="answered",
+    )
+    db.add(ai_question)
+    db.flush()
+    db.add(
+        OnboardingEvent(
+            newcomer_id=newcomer.id,
+            user_id=newcomer.user_id,
+            event_type="ai_question_asked",
+            entity_type="ai_question",
+            entity_id=ai_question.id,
+            topic="sales" if "CRM" in answer or "KPI" in answer else "deployment",
+        )
+    )
+    chunk = _first_chunk(db, source_doc)
+    if source_doc and chunk:
+        db.add(
+            AIQuestionSource(
+                question_id=ai_question.id,
+                document_id=source_doc.id,
+                chunk_id=chunk.id,
+                title=source_doc.title,
+                content_preview=chunk.content[:300],
+                similarity=0.88,
+            )
+        )
+    return ai_question
+
+
+def _create_assessment(
+    db: Session,
+    *,
+    newcomer: NewcomerProfile,
+    mentor: User,
+    title: str,
+    questions: list[dict],
+) -> Assessment:
+    assessment = Assessment(
+        newcomer_id=newcomer.id,
+        mentor_id=mentor.id,
+        title=title,
+        status="published",
+        mentor_notes="Seeded demo readiness check.",
+        role_context=newcomer.job_title,
+        generated_by_ai=True,
+        used_fallback=False,
+        published_at=datetime.now(timezone.utc),
+    )
+    db.add(assessment)
+    db.flush()
+    for index, item in enumerate(questions):
+        db.add(
+            AssessmentQuestion(
+                assessment_id=assessment.id,
+                order_index=index,
+                question_type=item["type"],
+                prompt=item["prompt"],
+                options=item.get("options"),
+                expected_answer=item.get("expected_answer"),
+                skill_tag=item["skill_tag"],
+                difficulty=item.get("difficulty", "medium"),
+            )
+        )
+    return assessment
 
 
 def reset_demo_data(db: Session) -> dict:
@@ -160,7 +727,10 @@ def reset_demo_data(db: Session) -> dict:
             AISignalFeedback,
             AIAnswerFeedback,
             AIQuestionSource,
-            AIQuestion,
+            AssessmentAnswer,
+            AssessmentSubmission,
+            AssessmentQuestion,
+            ScheduledMeeting,
             BlockedReport,
             PlanAdjustmentSuggestion,
             AISignal,
@@ -168,14 +738,21 @@ def reset_demo_data(db: Session) -> dict:
             OnboardingReflection,
             OnboardingEvent,
             NewcomerRecommendedContact,
+            LessonNote,
+            Lesson,
+            Course,
             OnboardingTask,
+            Week,
+            Sprint,
             OnboardingPlan,
-            NewcomerProfile,
             MentorDigest,
             CompanyOnboardingGap,
+            Assessment,
+            AIQuestion,
             DocumentChunk,
             Document,
             PersonContact,
+            NewcomerProfile,
             User,
         ]:
             db.query(model).delete(synchronize_session=False)
@@ -187,228 +764,367 @@ def reset_demo_data(db: Session) -> dict:
 
 
 def seed_demo_data(db: Session) -> dict:
-    existing_mentor = db.query(User).filter(User.email == "marko@techcorp.com").first()
+    existing_mentor = db.query(User).filter(User.email == "oleg@orynt.demo").first()
     if existing_mentor:
-        return {"already_seeded": True, "mentor_id": existing_mentor.id}
+        return _seed_response(db, already_seeded=True)
 
-    # 1. Users
-    mentor = User(email="marko@techcorp.com", full_name="Marko Ivanov", role="mentor")
-    newcomer_user = User(email="tanya@techcorp.com", full_name="Tanya Petrova", role="newcomer")
-    db.add_all([mentor, newcomer_user])
+    mentor = User(email="oleg@orynt.demo", full_name="Oleg Bondarenko", role="mentor")
+    marina_user = User(email="marina@orynt.demo", full_name="Marina Kovalenko", role="newcomer")
+    tanya_user = User(email="tanya@orynt.demo", full_name="Tanya Petrova", role="newcomer")
+    db.add_all([mentor, marina_user, tanya_user])
     db.flush()
 
-    # 2. NewcomerProfile
-    from datetime import date, timedelta
-    start_date = date.today() - timedelta(days=12)
-    newcomer = NewcomerProfile(
-        user_id=newcomer_user.id,
+    marina = NewcomerProfile(
+        user_id=marina_user.id,
         mentor_id=mentor.id,
-        job_title="Backend Developer",
-        seniority="middle",
-        team="Payments",
-        start_date=start_date,
+        job_title="Sales Manager / BDR",
+        seniority="Junior",
+        team="Sales",
+        start_date=date.today() - timedelta(days=10),
         onboarding_status="active",
     )
-    db.add(newcomer)
-    db.flush()
-
-    # 3. People contacts
-    for p in PEOPLE:
-        existing = db.query(PersonContact).filter(PersonContact.email == p["email"]).first()
-        if not existing:
-            contact = PersonContact(**p)
-            db.add(contact)
-    db.flush()
-
-    # 4. Documents
-    created_docs = []
-    for doc_data in DOCUMENTS:
-        doc = Document(**doc_data)
-        db.add(doc)
-        db.flush()
-        created_docs.append(doc)
-        try:
-            generate_chunks_for_document(db=db, document=doc)
-        except Exception:
-            pass
-
-    # 5. Plan
-    plan = OnboardingPlan(
-        newcomer_id=newcomer.id,
+    tanya = NewcomerProfile(
+        user_id=tanya_user.id,
         mentor_id=mentor.id,
-        title="Tanya Petrova — Backend Developer Onboarding (Payments)",
-        description="30/60/90-day onboarding plan for backend developer joining the Payments team.",
-        status="active",
-        generated_by_ai=True,
-        mentor_approved=True,
+        job_title="Backend Developer",
+        seniority="Middle",
+        team="Payments",
+        start_date=date.today() - timedelta(days=12),
+        onboarding_status="active",
     )
-    db.add(plan)
+    db.add_all([marina, tanya])
     db.flush()
 
-    # 6. Tasks
-    created_tasks = []
-    for t in PLAN_TASKS:
-        task = OnboardingTask(
-            plan_id=plan.id,
-            title=t["title"],
-            description=t["description"],
-            week_number=t["week_number"],
-            task_type=t["task_type"],
-            priority=t["priority"],
-            status=t["status"],
-        )
-        db.add(task)
-        db.flush()
-        created_tasks.append(task)
+    for person in PEOPLE:
+        db.add(PersonContact(**person))
+    db.flush()
 
-        db.add(OnboardingEvent(
-            newcomer_id=newcomer.id,
-            user_id=newcomer_user.id,
-            event_type="task_status_changed",
-            entity_type="onboarding_task",
-            entity_id=task.id,
-            topic=t["task_type"],
-            metadata_json={"task_title": t["title"], "status": t["status"]},
-        ))
+    docs = _create_documents(db)
 
-    blocked_task = next((task for task in created_tasks if task.status == "blocked"), None)
-    if blocked_task:
-        report = BlockedReport(
-            newcomer_id=newcomer.id,
+    marina_plan, marina_tasks = _create_plan(
+        db,
+        newcomer=marina,
+        mentor=mentor,
+        title="Marina Kovalenko - Sales/BDR Onboarding",
+        description="30-day plan focused on sales process, daily KPI discipline, CRM hygiene, and objection practice.",
+        goal="Make Marina ready to handle real cold and warm leads with clean CRM updates.",
+        tasks=MARINA_TASKS,
+    )
+    tanya_plan, tanya_tasks = _create_plan(
+        db,
+        newcomer=tanya,
+        mentor=mentor,
+        title="Tanya Petrova - Backend Developer Onboarding",
+        description="30-day plan focused on payments architecture, first PR, review quality, and deployment readiness.",
+        goal="Make Tanya confident to ship a backend PR and safely participate in staging deployment.",
+        tasks=TANYA_TASKS,
+    )
+
+    blocked_task = next(task for task in marina_tasks if task.status == "blocked")
+    db.add(
+        BlockedReport(
+            newcomer_id=marina.id,
             task_id=blocked_task.id,
-            user_id=newcomer_user.id,
-            blocker_type="access_issue",
+            user_id=marina_user.id,
+            blocker_type="crm_kpi_confusion",
             details=(
-                "I read the deployment guide but I still cannot access the staging namespace "
-                "and I am not sure who should approve the first deploy."
+                "Marina is unsure how to map Instagram/Facebook conversations into the KPI tracker "
+                "and has not updated plan/fact rows for two days."
             ),
             ai_suggestion=(
-                "Pair Tanya with Victor for a short deployment walkthrough and check staging permissions "
-                "before she attempts the first deploy."
+                "Schedule a 15-minute CRM hygiene walkthrough, then give Marina one clean example "
+                "for each source before the next outreach block."
             ),
             status="open",
         )
-        db.add(report)
-        db.flush()
+    )
 
-    # 7. AI Questions
-    deployment_doc = next((d for d in created_docs if "Deployment" in d.title), None)
-    deployment_chunk = None
-    if deployment_doc:
-        deployment_chunk = (
-            db.query(DocumentChunk)
-            .filter(DocumentChunk.document_id == deployment_doc.id)
-            .order_by(DocumentChunk.chunk_index.asc(), DocumentChunk.id.asc())
-            .first()
-        )
-    created_questions = []
-    for q_data in AI_QUESTIONS:
-        q = AIQuestion(
-            user_id=newcomer_user.id,
-            newcomer_id=newcomer.id,
-            question=q_data["question"],
-            answer=q_data["answer"],
-            status="answered",
-        )
-        db.add(q)
-        db.flush()
-        created_questions.append(q)
-
-        db.add(OnboardingEvent(
-            newcomer_id=newcomer.id,
-            user_id=newcomer_user.id,
-            event_type="ai_question_asked",
-            entity_type="ai_question",
-            entity_id=q.id,
-            topic="deployment",
-        ))
-
-        if deployment_doc and deployment_chunk:
-            source = AIQuestionSource(
-                question_id=q.id,
-                document_id=deployment_doc.id,
-                chunk_id=deployment_chunk.id,
-                title=deployment_doc.title,
-                content_preview=deployment_doc.content[:200],
-                similarity=0.85,
-            )
-            db.add(source)
-
-    # 8. AI Signal
-    signal = AISignal(
-        newcomer_id=newcomer.id,
-        signal_type="deployment_confusion",
+    tanya_signal_1 = AISignal(
+        newcomer_id=tanya.id,
+        signal_type="code_review_attention",
+        severity="medium",
+        tone="attention",
+        confidence=0.84,
+        score=0.71,
+        title="PR review loop needs mentor attention",
+        description="Tanya opened the first backend PR, but review comments are clustering around tests and API documentation.",
+        evidence="- First PR is in progress.\n- Code review checklist was opened.\n- Questions mention tests, docs and migration expectations.",
+        suggested_action="Pair for 20 minutes on one review comment and ask Tanya to update the PR checklist before re-requesting review.",
+        status="open",
+        occurrence_count=3,
+        target_task_id=next(task.id for task in tanya_tasks if task.task_type == "code_review"),
+    )
+    tanya_signal_2 = AISignal(
+        newcomer_id=tanya.id,
+        signal_type="deployment_readiness_attention",
         severity="high",
-        confidence=0.88,
+        tone="attention",
+        confidence=0.89,
         score=0.82,
-        title="Possible deployment process confusion",
-        description=(
-            "Tanya asked 4 questions related to deployment, staging, and release flow. "
-            "The deployment task is currently blocked. This may indicate friction before first production deploy."
-        ),
-        evidence=(
-            "- 4 questions related to deployment/release/staging.\n"
-            "- Question: \"How do I deploy my changes to staging?\"\n"
-            "- Question: \"Who approves the production deployment?\"\n"
-            "- 1 deployment-related task is blocked: \"Understand deployment flow\"\n"
-            "- Source 'Deployment Guide' used 4 times."
-        ),
-        suggested_action=(
-            "Schedule a 15-minute deployment walkthrough with Victor (DevOps) before first production deploy. "
-            "Focus on staging pipeline, release approval, rollback, and post-deploy monitoring."
-        ),
+        title="Deployment readiness is not yet proven",
+        description="Tanya read the deployment guide but has not yet practiced rollout status, monitoring or rollback.",
+        evidence="- Deployment checklist task is still todo.\n- AI questions focus on staging, approvals and rollback.\n- Production deploy shadowing is scheduled later this week.",
+        suggested_action="Keep production deploy shadowing, but add a staging dry run with Victor before any release responsibility.",
         status="open",
         occurrence_count=4,
+        target_task_id=next(task.id for task in tanya_tasks if task.title.startswith("Prepare staging")),
     )
-    db.add(signal)
+    db.add_all([tanya_signal_1, tanya_signal_2])
     db.flush()
 
-    # 9. Plan Adjustment
-    adjustment = PlanAdjustmentSuggestion(
-        newcomer_id=newcomer.id,
-        plan_id=plan.id,
-        signal_id=signal.id,
-        title="Adapt Week 2: Add deployment practice",
-        reason=(
-            "Tanya shows strong progress in API and SQL work but has friction with deployment. "
-            "Reducing reading tasks and adding hands-on deployment practice will unblock her."
-        ),
-        suggested_changes=[
-            {
-                "action": "add_task",
-                "title": "Deployment pairing session with Victor",
-                "description": "Walk through staging access, release approval, rollback, and monitoring.",
-                "task_type": "deployment",
-                "week_number": 2,
-                "day_number": 4,
-                "priority": "high",
-                "success_criteria": "Tanya can explain the deployment flow and knows who approves production releases.",
-            },
-            {
-                "action": "add_task",
-                "title": "Staging deploy simulation",
-                "description": "Run a safe staging deploy simulation with Victor or Marko.",
-                "task_type": "deployment",
-                "week_number": 2,
-                "day_number": 5,
-                "priority": "high",
-                "success_criteria": "Tanya can complete the staging checklist without being blocked.",
-            },
-            {"action": "modify", "title": "Move first production deploy milestone by 3 days", "task_type": "deployment", "week_number": 3},
-        ],
-        status="pending",
+    db.add(
+        PlanAdjustmentSuggestion(
+            newcomer_id=marina.id,
+            plan_id=marina_plan.id,
+            signal_id=None,
+            title="Adapt Marina Week 2: CRM and objection recovery",
+            reason=(
+                "Marina is blocked on KPI/CRM discipline and is still shaky on price objections. "
+                "Reducing new outreach volume for one day creates room for practice and cleanup."
+            ),
+            suggested_changes=[
+                {
+                    "action": "add_task",
+                    "title": "CRM hygiene walkthrough with Oleg",
+                    "description": "Walk through one Instagram, one Facebook and one Email lead from contact to KPI fact row.",
+                    "task_type": "crm",
+                    "week_number": 2,
+                    "day_number": 2,
+                    "priority": "high",
+                    "success_criteria": "Marina can update all KPI rows without mentor correction.",
+                },
+                {
+                    "action": "add_task",
+                    "title": "Objection practice: expensive and not now",
+                    "description": "Run two AI-client role plays using the objection playbook.",
+                    "task_type": "role_play",
+                    "week_number": 2,
+                    "day_number": 3,
+                    "priority": "high",
+                    "success_criteria": "Marina handles both objections with problem-cost framing.",
+                },
+            ],
+            status="pending",
+            target_scope="week",
+        )
     )
-    db.add(adjustment)
+
+    db.add_all(
+        [
+            ProgressSnapshot(
+                newcomer_id=marina.id,
+                week_number=2,
+                completed_tasks=3,
+                blocked_tasks=1,
+                open_signals=0,
+                progress_percent=38,
+                strengths=["ICP basics", "cold message drafting"],
+                gaps=["CRM discipline", "KPI plan/fact", "price objections"],
+                mentor_notes="Marina is promising but needs a concrete CRM example before more outreach volume.",
+            ),
+            ProgressSnapshot(
+                newcomer_id=tanya.id,
+                week_number=2,
+                completed_tasks=3,
+                blocked_tasks=0,
+                open_signals=2,
+                progress_percent=52,
+                strengths=["architecture tracing", "first PR ownership"],
+                gaps=["review checklist depth", "deployment confidence"],
+                mentor_notes="Tanya is progressing well; the signals are attention items, not blockers.",
+            ),
+        ]
+    )
+
+    questions_created = 0
+    for payload in [
+        (
+            marina,
+            "Яка денна норма контактів для Sales Manager?",
+            "Денний план: Freelancehunt 20, Instagram 30, Facebook 40, Email 20, LinkedIn 10, Telegram 5; всього 125 контактів.",
+            _find_doc(docs, "Щоденка"),
+        ),
+        (
+            marina,
+            "Що відповідати, якщо клієнт каже що дорого?",
+            "Не знижуйте ціну одразу. Переведіть розмову на вартість поточної проблеми і порахуйте час ментора або втрачений результат.",
+            _find_doc(docs, "Objections"),
+        ),
+        (
+            marina,
+            "Що має бути в діагностичному дзвінку?",
+            "Потрібно зібрати цілі, стан бізнесу, бюджет, проблеми, потенціал клієнта і домовитись про наступний крок.",
+            _find_doc(docs, "Регламент"),
+        ),
+        (
+            tanya,
+            "How do I deploy my changes to staging?",
+            "Merge after 2 approvals, wait for CI, verify staging, then follow the deployment guide for production readiness.",
+            _find_doc(docs, "Deployment"),
+        ),
+        (
+            tanya,
+            "Who approves payment-gateway changes?",
+            "Tech lead approval is mandatory for payment-gateway changes; Victor supports infrastructure questions.",
+            _find_doc(docs, "Architecture"),
+        ),
+        (
+            tanya,
+            "What should be in my PR description?",
+            "Include what changed, how to test it, and a Jira link. Make sure tests pass and API changes are documented.",
+            _find_doc(docs, "Code Review"),
+        ),
+    ]:
+        _create_ai_question(
+            db,
+            newcomer=payload[0],
+            question=payload[1],
+            answer=payload[2],
+            source_doc=payload[3],
+        )
+        questions_created += 1
+
+    _create_assessment(
+        db,
+        newcomer=marina,
+        mentor=mentor,
+        title="Sales readiness check",
+        questions=[
+            {
+                "type": "mcq",
+                "prompt": "What is the main purpose of the first cold outreach?",
+                "options": [
+                    {"id": "a", "label": "Close the deal immediately", "is_correct": False},
+                    {"id": "b", "label": "Get a reply and book a diagnostic call", "is_correct": True},
+                    {"id": "c", "label": "Send a full proposal", "is_correct": False},
+                ],
+                "skill_tag": "cold_outreach",
+                "difficulty": "easy",
+            },
+            {
+                "type": "short_answer",
+                "prompt": "Name three fields Marina should capture during a diagnostic call.",
+                "expected_answer": "Goals, business state, budget, problems, decision role, deadline or next step.",
+                "skill_tag": "discovery",
+            },
+        ],
+    )
+    _create_assessment(
+        db,
+        newcomer=tanya,
+        mentor=mentor,
+        title="Backend readiness check",
+        questions=[
+            {
+                "type": "mcq",
+                "prompt": "When does staging deploy trigger?",
+                "options": [
+                    {"id": "a", "label": "After CI passes on a merged PR", "is_correct": True},
+                    {"id": "b", "label": "Before code review", "is_correct": False},
+                    {"id": "c", "label": "Only manually on Fridays", "is_correct": False},
+                ],
+                "skill_tag": "deployment",
+                "difficulty": "medium",
+            },
+            {
+                "type": "short_answer",
+                "prompt": "What should a backend PR description include?",
+                "expected_answer": "What changed, how to test, and a Jira link; API or migration details if relevant.",
+                "skill_tag": "code_review",
+            },
+        ],
+    )
+
+    now = datetime.now(timezone.utc)
+    meetings = [
+        ScheduledMeeting(
+            newcomer_id=marina.id,
+            organizer_user_id=mentor.id,
+            plan_id=marina_plan.id,
+            task_id=blocked_task.id,
+            title="CRM hygiene unblock",
+            agenda="Map three real leads into KPI plan/fact rows and confirm the reporting habit.",
+            starts_at=now + timedelta(days=1, hours=2),
+            ends_at=now + timedelta(days=1, hours=2, minutes=30),
+            attendee_emails=[mentor.email, marina_user.email],
+            teams_join_url="https://teams.microsoft.com/l/demo-marina-crm",
+            status="confirmed",
+        ),
+        ScheduledMeeting(
+            newcomer_id=marina.id,
+            organizer_user_id=mentor.id,
+            plan_id=marina_plan.id,
+            title="Objection role-play: price and timing",
+            agenda="Practice two AI-client scenarios from the objection playbook.",
+            starts_at=now + timedelta(days=3, hours=1),
+            ends_at=now + timedelta(days=3, hours=1, minutes=45),
+            attendee_emails=[mentor.email, marina_user.email, "katia@orynt.demo"],
+            teams_join_url="https://teams.microsoft.com/l/demo-marina-objections",
+            status="proposed",
+        ),
+        ScheduledMeeting(
+            newcomer_id=tanya.id,
+            organizer_user_id=mentor.id,
+            plan_id=tanya_plan.id,
+            task_id=next(task.id for task in tanya_tasks if task.task_type == "code_review"),
+            signal_id=tanya_signal_1.id,
+            title="First PR review pairing",
+            agenda="Resolve one test comment and one API documentation comment together.",
+            starts_at=now + timedelta(days=1, hours=5),
+            ends_at=now + timedelta(days=1, hours=5, minutes=30),
+            attendee_emails=[mentor.email, tanya_user.email],
+            teams_join_url="https://teams.microsoft.com/l/demo-tanya-pr",
+            status="confirmed",
+        ),
+        ScheduledMeeting(
+            newcomer_id=tanya.id,
+            organizer_user_id=mentor.id,
+            plan_id=tanya_plan.id,
+            task_id=next(task.id for task in tanya_tasks if task.task_type == "deployment"),
+            signal_id=tanya_signal_2.id,
+            title="Staging deployment dry run",
+            agenda="Run rollout status, monitoring checklist and rollback drill with Victor.",
+            starts_at=now + timedelta(days=4, hours=3),
+            ends_at=now + timedelta(days=4, hours=4),
+            attendee_emails=[mentor.email, tanya_user.email, "victor@orynt.demo"],
+            teams_join_url="https://teams.microsoft.com/l/demo-tanya-deploy",
+            status="proposed",
+        ),
+    ]
+    db.add_all(meetings)
+
+    db.add(
+        MentorDigest(
+            mentor_id=mentor.id,
+            week_start=date.today() - timedelta(days=date.today().weekday()),
+            week_end=date.today() - timedelta(days=date.today().weekday()) + timedelta(days=6),
+            summary=(
+                "Marina needs CRM/KPI help before scaling outreach. Tanya is moving well, "
+                "but PR review and deployment readiness need attention this week."
+            ),
+            highlights=[
+                "Marina completed ICP and outreach drafting.",
+                "Tanya traced payments architecture and opened a first PR.",
+            ],
+            risks=[
+                "Marina is blocked on KPI plan/fact reporting.",
+                "Tanya has not yet proven deployment readiness.",
+            ],
+            recommended_actions=[
+                "Run Marina CRM hygiene unblock.",
+                "Keep Tanya staging dry run with Victor.",
+            ],
+        )
+    )
 
     db.commit()
 
-    return {
-        "mentor_id": mentor.id,
-        "newcomer_id": newcomer.id,
-        "newcomer_user_id": newcomer_user.id,
-        "plan_id": plan.id,
-        "signal_id": signal.id,
-        "documents_created": len(created_docs),
-        "tasks_created": len(created_tasks),
-        "questions_created": len(created_questions),
-    }
+    return _seed_response(
+        db,
+        documents_created=len(docs),
+        tasks_created=len(marina_tasks) + len(tanya_tasks),
+        questions_created=questions_created,
+        meetings_created=len(meetings),
+        signals_created=2,
+        blocked_reports_created=1,
+    )

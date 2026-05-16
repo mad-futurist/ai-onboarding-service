@@ -12,11 +12,16 @@ class SeedResponse(BaseModel):
     mentor_id: int | None = None
     newcomer_id: int | None = None
     newcomer_user_id: int | None = None
+    newcomer_ids: list[int] = []
+    personas: list[dict] = []
     plan_id: int | None = None
     signal_id: int | None = None
     documents_created: int | None = None
     tasks_created: int | None = None
     questions_created: int | None = None
+    meetings_created: int | None = None
+    signals_created: int | None = None
+    blocked_reports_created: int | None = None
     already_seeded: bool = False
 
 
