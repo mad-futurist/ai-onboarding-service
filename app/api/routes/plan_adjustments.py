@@ -12,6 +12,7 @@ from app.schemas.plan_adjustment import (
 from app.services.plan_adjustment_service import (
     apply_adjustment,
     approve_adjustment,
+    generate_adjustment_for_period,
     generate_adjustment_from_signal,
     reject_adjustment,
 )
@@ -45,6 +46,23 @@ def generate_plan_adjustment_from_signal(
         status=adjustment.status,
         suggested_changes_count=len(adjustment.suggested_changes or []),
     )
+
+
+@router.post(
+    "/generate/for-period/{plan_id}",
+    response_model=PlanAdjustmentRead,
+)
+def generate_plan_adjustment_for_period(
+    plan_id: int,
+    db: Session = Depends(get_db),
+):
+    try:
+        return generate_adjustment_for_period(
+            db=db,
+            plan_id=plan_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @router.get("/", response_model=list[PlanAdjustmentRead])
