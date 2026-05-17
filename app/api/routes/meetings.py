@@ -1,15 +1,19 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.models.newcomer import NewcomerProfile
 from app.models.scheduled_meeting import ScheduledMeeting
+from app.models.user import User
 from app.schemas.scheduled_meeting import (
     ScheduledMeetingCreate,
     ScheduledMeetingRead,
     ScheduledMeetingUpdate,
 )
+from app.services.notification_service import create_notification
 
 
 router = APIRouter(prefix="/meetings", tags=["Meetings"])
@@ -64,6 +68,8 @@ def create_meeting(payload: ScheduledMeetingCreate, db: Session = Depends(get_db
         status=payload.status or "proposed",
     )
     db.add(meeting)
+    db.flush()
+    _notify_meeting_participants(db, meeting=meeting, payload=payload)
     db.commit()
     db.refresh(meeting)
     return meeting
@@ -100,3 +106,80 @@ def delete_meeting(meeting_id: int, db: Session = Depends(get_db)):
     db.delete(meeting)
     db.commit()
     return {"detail": "Meeting deleted", "meeting_id": meeting_id}
+
+
+def _notify_meeting_participants(
+    db: Session,
+    *,
+    meeting: ScheduledMeeting,
+    payload: ScheduledMeetingCreate,
+) -> None:
+    recipient_user_ids = _meeting_recipient_user_ids(db, payload=payload)
+    if not recipient_user_ids:
+        return
+
+    time_range = _format_meeting_range(meeting.starts_at, meeting.ends_at)
+    body_parts = [time_range]
+    if meeting.agenda:
+        body_parts.append(meeting.agenda[:240])
+    if meeting.teams_join_url:
+        body_parts.append("Teams link attached.")
+
+    for user_id in recipient_user_ids:
+        create_notification(
+            db,
+            user_id=user_id,
+            type="meeting_scheduled",
+            title=f"Meeting scheduled: {meeting.title}"[:255],
+            body="\n\n".join(body_parts),
+            related_task_id=meeting.task_id,
+            related_signal_id=meeting.signal_id,
+        )
+
+
+def _meeting_recipient_user_ids(
+    db: Session,
+    *,
+    payload: ScheduledMeetingCreate,
+) -> list[int]:
+    recipient_user_ids: set[int] = set()
+
+    if payload.organizer_user_id is not None:
+        recipient_user_ids.add(payload.organizer_user_id)
+
+    if payload.newcomer_id is not None:
+        newcomer = (
+            db.query(NewcomerProfile)
+            .filter(NewcomerProfile.id == payload.newcomer_id)
+            .first()
+        )
+        if newcomer:
+            recipient_user_ids.add(newcomer.user_id)
+            if payload.organizer_user_id is None and newcomer.mentor_id is not None:
+                recipient_user_ids.add(newcomer.mentor_id)
+
+    if payload.attendee_emails:
+        emails = {
+            email.strip().lower()
+            for email in payload.attendee_emails
+            if email and email.strip()
+        }
+        if emails:
+            users = (
+                db.query(User)
+                .filter(func.lower(User.email).in_(emails))
+                .all()
+            )
+            recipient_user_ids.update(user.id for user in users)
+
+    if payload.created_by_user_id is not None:
+        recipient_user_ids.discard(payload.created_by_user_id)
+
+    return sorted(recipient_user_ids)
+
+
+def _format_meeting_range(starts_at: datetime, ends_at: datetime) -> str:
+    same_day = starts_at.date() == ends_at.date()
+    if same_day:
+        return f"{starts_at:%b %d, %Y %H:%M} - {ends_at:%H:%M}"
+    return f"{starts_at:%b %d, %Y %H:%M} - {ends_at:%b %d, %Y %H:%M}"

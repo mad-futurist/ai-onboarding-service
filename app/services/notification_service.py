@@ -12,6 +12,8 @@ def create_notification(
     body: str,
     related_task_id: int | None = None,
     related_comment_id: int | None = None,
+    related_signal_id: int | None = None,
+    related_signal_feedback_id: int | None = None,
 ) -> Notification:
     notification = Notification(
         user_id=user_id,
@@ -20,6 +22,8 @@ def create_notification(
         body=body,
         related_task_id=related_task_id,
         related_comment_id=related_comment_id,
+        related_signal_id=related_signal_id,
+        related_signal_feedback_id=related_signal_feedback_id,
     )
     db.add(notification)
     db.flush()

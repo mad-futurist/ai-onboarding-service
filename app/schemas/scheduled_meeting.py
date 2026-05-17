@@ -9,6 +9,7 @@ class ScheduledMeetingCreate(BaseModel):
     ends_at: datetime
     newcomer_id: int | None = None
     organizer_user_id: int | None = None
+    created_by_user_id: int | None = None
     plan_id: int | None = None
     task_id: int | None = None
     signal_id: int | None = None

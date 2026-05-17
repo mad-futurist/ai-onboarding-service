@@ -118,6 +118,8 @@ class NotificationRead(BaseModel):
     body: str
     related_task_id: int | None = None
     related_comment_id: int | None = None
+    related_signal_id: int | None = None
+    related_signal_feedback_id: int | None = None
     read_at: datetime | None = None
     created_at: datetime
 

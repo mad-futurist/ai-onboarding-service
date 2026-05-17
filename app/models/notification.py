@@ -30,6 +30,17 @@ class Notification(Base):
         ForeignKey("task_comments.id", ondelete="SET NULL"),
         nullable=True,
     )
+    related_signal_id = Column(
+        Integer,
+        ForeignKey("ai_signals.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    related_signal_feedback_id = Column(
+        Integer,
+        ForeignKey("ai_signal_feedbacks.id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     read_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(
