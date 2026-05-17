@@ -162,7 +162,7 @@ SALES_JOB_DESCRIPTION = """
 
 
 DAILY_KPI_TEMPLATE = """
-Щоденка задачі: шаблон для Sales Manager.
+Щоденник задач: шаблон для менеджера з продажів.
 
 План на день:
 - ставки на Freelancehunt: 20;
@@ -186,16 +186,16 @@ Freelancehunt, Instagram, Facebook, Email, LinkedIn, Telegram, репости.
 
 
 PRODUCT_DEFINITION = """
-PRODUCT DEFINITION v3: AI Sales Onboarding Agent.
+ОПИС ПРОДУКТУ v3: AI-агент онбордингу продажів.
 
-Ідея: AI-система визначає готовність sales-спеціаліста до роботи:
+Ідея: AI-система визначає готовність спеціаліста з продажів до роботи:
 веде новачка від визначення рівня через персоналізоване навчання до
 підтвердження готовності працювати з реальними лідами.
 
 Відмінність від конкурентів:
 - LMS навчають, але не підтверджують готовність;
 - HRM керують процесами, але не тренують рольові навички;
-- Sales Analytics аналізують результат, але не ведуть онбординг.
+- Аналітика продажів аналізує результат, але не веде онбординг.
 
 Наш підхід:
 - тест при першому вході;
@@ -225,9 +225,9 @@ SALES_PRACTICE_LIBRARY = """
 
 Заперечення:
 1. "Це дорого для нас зараз." Відповідь: порівняйте ціну продукту з вартістю
-поточної проблеми. Якщо Head of Sales витрачає 8 год/тиждень по $50/год,
+поточної проблеми. Якщо керівник продажів витрачає 8 год/тиждень по $50/год,
 це $1600 за місяць на одного новачка.
-2. "Зараз не кращий час." Відповідь: запитайте, чи планують наймати Sales
+2. "Зараз не кращий час." Відповідь: запитайте, чи планують наймати спеціалістів з продажів
 цього кварталу. Якщо так, кожен тиждень затримки коштує часу ментора.
 3. "Ми вже використовуємо Notion." Відповідь: Notion зберігає знання, але не
 перевіряє засвоєння і не дає рольову практику.
@@ -237,17 +237,17 @@ SALES_PRACTICE_LIBRARY = """
 і термін 4 або 6 тижнів.
 
 Кейси:
-- Finteco: Head of Sales витрачав 10+ год/тиждень на новачка; ROI у годинах
+- Finteco: керівник продажів витрачав 10+ год/тиждень на новачка; ROI у годинах
 ментора допоміг закрити річний контракт.
 - TechSales UA: HR Director купила не "онбординг", а інструмент зменшення
-плинності нових Sales.
+плинності нових спеціалістів з продажів.
 - RetailGroup: угоду програли через внутрішній IT-проєкт, який не виявили.
 - StartupX: proposal був занадто дорогим для seed-стадії.
 - SalesForce UA: повернення після "не зараз" спрацювало, коли з'явився
 тригер найму.
 
 AI-клієнти:
-- Олексій Коваль, Head of Sales: прагматик, говорить цифрами, питає ROI.
+- Олексій Коваль, керівник продажів: прагматик, говорить цифрами, питає ROI.
 - Наталя Мороз, HR Director: турбується про employee experience.
 - Дмитро Савченко, COO: питає про масштабування, безпеку, інтеграції.
 - Аліна Лисенко, CEO: швидко вирішує, але не має часу на складний запуск.
@@ -255,7 +255,7 @@ AI-клієнти:
 
 
 SALES_FOUNDATIONS = """
-Основи продажів для Sales Manager.
+Основи продажів для менеджера з продажів.
 
 Холодний лід — людина або компанія, яка ще не проявила явного інтересу.
 Мета першого контакту: не продати одразу, а отримати відповідь і короткий
@@ -301,12 +301,12 @@ BACKEND_DOCUMENTS = [
         "scope": "enterprise",
     },
     {
-        "title": "Payments Team Architecture Overview",
+        "title": "Огляд архітектури команди Payments",
         "content": (
-            "Payments owns payment-gateway, fraud-detection, settlement-service, reconciliation-service.\n"
-            "Tech stack: Python FastAPI, PostgreSQL, Redis, Kafka, Kubernetes on AWS EKS.\n"
-            "Services communicate via Kafka events. REST APIs are only for external clients.\n"
-            "Tech lead approval is mandatory for payment-gateway changes."
+            "Команда Payments відповідає за payment-gateway, fraud-detection, settlement-service, reconciliation-service.\n"
+            "Технічний стек: Python FastAPI, PostgreSQL, Redis, Kafka, Kubernetes на AWS EKS.\n"
+            "Сервіси обмінюються даними через Kafka events. REST APIs використовуються лише для зовнішніх клієнтів.\n"
+            "Для змін у payment-gateway обов'язкове схвалення tech lead."
         ),
         "source": "Engineering",
         "document_type": "architecture",
@@ -315,12 +315,12 @@ BACKEND_DOCUMENTS = [
         "scope": "team",
     },
     {
-        "title": "Deployment Guide",
+        "title": "Посібник із deployment",
         "content": (
-            "Deployment flow: merge PR after 2 approvals, CI runs automatically, staging deploys after CI passes.\n"
-            "Verify on staging.payments.techcorp.internal. For production, post in #deploys, run kubectl rollout status,\n"
-            "monitor Grafana for 15 minutes, rollback with kubectl rollout undo if needed.\n"
-            "Victor handles infrastructure; Oleg gives release approval."
+            "Deployment flow: merge PR після 2 схвалень, CI запускається автоматично, staging розгортається після успішного CI.\n"
+            "Перевірте на staging.payments.techcorp.internal. Для production напишіть у #deploys, запустіть kubectl rollout status,\n"
+            "моніторте Grafana 15 хвилин, за потреби зробіть rollback через kubectl rollout undo.\n"
+            "Victor відповідає за infrastructure; Oleg дає схвалення release."
         ),
         "source": "Engineering",
         "document_type": "guide",
@@ -329,11 +329,11 @@ BACKEND_DOCUMENTS = [
         "scope": "team",
     },
     {
-        "title": "Code Review Checklist",
+        "title": "Чекліст code review",
         "content": (
-            "Before opening a PR: all tests pass, no debug statements, unit tests added, API changes documented,\n"
-            "migrations reversible. PR description includes what changed, how to test, and Jira link.\n"
-            "Reviewers have 24h; address comments before merging; tech lead approves payment-critical changes last."
+            "Перед відкриттям PR: усі tests проходять, немає debug statements, додано unit tests, API changes задокументовано,\n"
+            "migrations зворотні. Опис PR містить, що змінилося, як тестувати, і Jira link.\n"
+            "Reviewers мають 24 год; опрацюйте коментарі перед merge; tech lead останнім схвалює критичні для payments зміни."
         ),
         "source": "Engineering",
         "document_type": "checklist",
@@ -342,11 +342,11 @@ BACKEND_DOCUMENTS = [
         "scope": "team",
     },
     {
-        "title": "Jira Workflow Guide",
+        "title": "Посібник із Jira workflow",
         "content": (
-            "Ticket statuses: Backlog, To Do, In Progress, In Review, Done. Sprint planning every 2 weeks Monday.\n"
-            "Daily standup is async in #payments-standup by 10:00. Assign ticket before work, move to In Review when PR opens,\n"
-            "move to Done after merge. Bugs require reproduction steps and logs."
+            "Статуси ticket: Backlog, To Do, In Progress, In Review, Done. Sprint planning щопонеділка раз на 2 тижні.\n"
+            "Daily standup асинхронний у #payments-standup до 10:00. Призначайте ticket перед роботою, переводьте в In Review після відкриття PR,\n"
+            "переводьте в Done після merge. Для bugs потрібні кроки відтворення та logs."
         ),
         "source": "Engineering",
         "document_type": "guide",
@@ -361,16 +361,16 @@ SALES_DOCUMENTS = [
     {
         "title": "Регламент роботи відділу продажів 2026",
         "content": SALES_REGULATION,
-        "source": "Sales Ops",
+        "source": "Операції продажів",
         "document_type": "policy",
         "domain": "sales",
         "role_target": "sales_manager",
         "scope": "team",
     },
     {
-        "title": "Що має вміти Sales Manager",
+        "title": "Що має вміти менеджер з продажів",
         "content": SALES_SKILLS,
-        "source": "Sales Enablement",
+        "source": "Підтримка продажів",
         "document_type": "reference",
         "domain": "sales",
         "role_target": "sales_manager",
@@ -386,16 +386,16 @@ SALES_DOCUMENTS = [
         "scope": "role",
     },
     {
-        "title": "Щоденка задачі Sales KPI",
+        "title": "Щоденник задач KPI продажів",
         "content": DAILY_KPI_TEMPLATE,
-        "source": "Sales Ops",
+        "source": "Операції продажів",
         "document_type": "checklist",
         "domain": "sales",
         "role_target": "sales_manager",
         "scope": "team",
     },
     {
-        "title": "Product Definition v3 - AI Sales Onboarding Agent",
+        "title": "Опис продукту v3 - AI-агент онбордингу продажів",
         "content": PRODUCT_DEFINITION,
         "source": "Product",
         "document_type": "reference",
@@ -404,18 +404,18 @@ SALES_DOCUMENTS = [
         "scope": "enterprise",
     },
     {
-        "title": "Sales Objections, Cases and AI Clients",
+        "title": "Заперечення у продажах, кейси та AI-клієнти",
         "content": SALES_PRACTICE_LIBRARY,
-        "source": "Sales Enablement",
+        "source": "Підтримка продажів",
         "document_type": "playbook",
         "domain": "sales",
         "role_target": "sales_manager",
         "scope": "role",
     },
     {
-        "title": "Sales Foundations: Leads, Follow-up, CRM",
+        "title": "Основи продажів: ліди, подальші дії, CRM",
         "content": SALES_FOUNDATIONS,
-        "source": "Sales Enablement",
+        "source": "Підтримка продажів",
         "document_type": "guide",
         "domain": "sales",
         "role_target": "sales_manager",
@@ -425,35 +425,35 @@ SALES_DOCUMENTS = [
 
 
 PEOPLE = [
-    {"full_name": "Oleg Bondarenko", "role": "Head of Sales", "team": "Sales", "email": "oleg@orynt.demo", "topics": ["sales_onboarding", "kpi", "objections", "crm"]},
-    {"full_name": "Natalia Moroz", "role": "HR Director", "team": "People", "email": "natalia@orynt.demo", "topics": ["employee_experience", "retention", "onboarding_quality"]},
+    {"full_name": "Oleg Bondarenko", "role": "Керівник продажів", "team": "Продажі", "email": "oleg@orynt.demo", "topics": ["sales_onboarding", "kpi", "objections", "crm"]},
+    {"full_name": "Natalia Moroz", "role": "HR-директор", "team": "Люди", "email": "natalia@orynt.demo", "topics": ["employee_experience", "retention", "onboarding_quality"]},
     {"full_name": "Victor Petrenko", "role": "DevOps Engineer", "team": "Infrastructure", "email": "victor@orynt.demo", "topics": ["deployment", "kubernetes", "staging", "rollback"]},
-    {"full_name": "Katia Shevchenko", "role": "Senior AE", "team": "Sales", "email": "katia@orynt.demo", "topics": ["demo", "pricing", "competitive_intel", "enterprise_deals"]},
+    {"full_name": "Katia Shevchenko", "role": "Senior AE", "team": "Продажі", "email": "katia@orynt.demo", "topics": ["demo", "pricing", "competitive_intel", "enterprise_deals"]},
     {"full_name": "Ana Kovalenko", "role": "QA Engineer", "team": "Payments", "email": "ana@orynt.demo", "topics": ["testing", "qa", "bug_reporting"]},
 ]
 
 
 MARINA_TASKS = [
-    {"week": 1, "day": 1, "title": "Review sales onboarding baseline", "description": "Review ICP, outreach, CRM, and objection-handling expectations already captured during kickoff.", "type": "reading", "status": "done", "priority": "high"},
-    {"week": 1, "day": 2, "title": "Read sales process and KPI regulation", "description": "Understand lead generation, diagnostic calls, proposal flow, and daily activity norms.", "type": "reading", "status": "done", "priority": "high"},
-    {"week": 1, "day": 3, "title": "Write first cold outreach sequence", "description": "Draft three short messages for Facebook, Instagram and LinkedIn using the company ICP.", "type": "outreach", "status": "done", "priority": "high"},
-    {"week": 1, "day": 4, "title": "Log daily KPI table accurately", "description": "Fill plan/fact for every source and attach repost links.", "type": "crm", "status": "blocked", "priority": "high"},
-    {"week": 2, "day": 1, "title": "Run objection role-play: too expensive", "description": "Practice moving from price to cost of current problem.", "type": "role_play", "status": "in_progress", "priority": "high"},
-    {"week": 2, "day": 2, "title": "Prepare diagnostic call brief", "description": "Use problem, budget, decision role, deadline and current solution fields.", "type": "discovery", "status": "todo", "priority": "medium"},
-    {"week": 2, "day": 3, "title": "Create follow-up cadence for warm leads", "description": "Draft 24h, 3-day and 7-day follow-ups with value add.", "type": "follow_up", "status": "todo", "priority": "medium"},
-    {"week": 3, "day": 1, "title": "Shadow Katia on a proposal presentation", "description": "Watch how a senior seller handles objections and confirms next steps.", "type": "shadowing", "status": "todo", "priority": "medium"},
+    {"week": 1, "day": 1, "title": "Переглянути базу онбордингу продажів", "description": "Переглянути очікування щодо ICP, outreach, CRM і роботи із запереченнями, зафіксовані під час kickoff.", "type": "reading", "status": "done", "priority": "high"},
+    {"week": 1, "day": 2, "title": "Прочитати процес продажів і регламент KPI", "description": "Зрозуміти лідогенерацію, діагностичні дзвінки, потік комерційних пропозицій і щоденні норми активності.", "type": "reading", "status": "done", "priority": "high"},
+    {"week": 1, "day": 3, "title": "Написати першу послідовність холодного outreach", "description": "Підготувати три короткі повідомлення для Facebook, Instagram і LinkedIn на основі ICP компанії.", "type": "outreach", "status": "done", "priority": "high"},
+    {"week": 1, "day": 4, "title": "Точно заповнювати щоденну таблицю KPI", "description": "Заповнити план/факт для кожного джерела й додати посилання на репости.", "type": "crm", "status": "blocked", "priority": "high"},
+    {"week": 2, "day": 1, "title": "Провести role-play із запереченням: занадто дорого", "description": "Потренувати перехід від ціни до вартості поточної проблеми.", "type": "role_play", "status": "in_progress", "priority": "high"},
+    {"week": 2, "day": 2, "title": "Підготувати brief для діагностичного дзвінка", "description": "Використати поля: проблема, бюджет, роль у прийнятті рішення, дедлайн і поточне рішення.", "type": "discovery", "status": "todo", "priority": "medium"},
+    {"week": 2, "day": 3, "title": "Створити cadence подальших дій для теплих лідів", "description": "Підготувати follow-up через 24 год, 3 дні й 7 днів із доданою цінністю.", "type": "follow_up", "status": "todo", "priority": "medium"},
+    {"week": 3, "day": 1, "title": "Поспостерігати за презентацією пропозиції Katia", "description": "Подивитися, як досвідчений продавець працює із запереченнями й підтверджує наступні кроки.", "type": "shadowing", "status": "todo", "priority": "medium"},
 ]
 
 
 TANYA_TASKS = [
-    {"week": 1, "day": 1, "title": "Set up local development environment", "description": "Clone repos, install dependencies, run backend tests locally.", "type": "setup", "status": "done", "priority": "high"},
-    {"week": 1, "day": 2, "title": "Trace payment-gateway request flow", "description": "Follow one external API call through FastAPI, Kafka and PostgreSQL.", "type": "architecture", "status": "done", "priority": "high"},
-    {"week": 1, "day": 3, "title": "Read code review checklist", "description": "Map every checklist item to the first PR draft.", "type": "reading", "status": "done", "priority": "medium"},
-    {"week": 2, "day": 1, "title": "Open first backend PR", "description": "Fix a small payment-gateway validation issue and request two reviews.", "type": "development", "status": "in_progress", "priority": "high"},
-    {"week": 2, "day": 2, "title": "Resolve PR comments", "description": "Address API docs, unit tests and migration questions.", "type": "code_review", "status": "in_progress", "priority": "high"},
-    {"week": 2, "day": 4, "title": "Prepare staging deployment checklist", "description": "Explain deploy, monitor and rollback steps before touching production.", "type": "deployment", "status": "todo", "priority": "high"},
-    {"week": 3, "day": 1, "title": "Shadow production deployment", "description": "Join Victor for rollout status, Grafana monitoring and rollback drill.", "type": "deployment", "status": "todo", "priority": "medium"},
-    {"week": 3, "day": 3, "title": "Document first PR learning notes", "description": "Capture architecture notes and gotchas for the next newcomer.", "type": "documentation", "status": "todo", "priority": "medium"},
+    {"week": 1, "day": 1, "title": "Налаштувати локальне development environment", "description": "Клонувати repos, встановити dependencies, запустити backend tests локально.", "type": "setup", "status": "done", "priority": "high"},
+    {"week": 1, "day": 2, "title": "Простежити request flow у payment-gateway", "description": "Провести один зовнішній API call через FastAPI, Kafka і PostgreSQL.", "type": "architecture", "status": "done", "priority": "high"},
+    {"week": 1, "day": 3, "title": "Прочитати чекліст code review", "description": "Зіставити кожен пункт чекліста з першою чернеткою PR.", "type": "reading", "status": "done", "priority": "medium"},
+    {"week": 2, "day": 1, "title": "Відкрити перший backend PR", "description": "Виправити невелику проблему validation у payment-gateway і запросити два reviews.", "type": "development", "status": "in_progress", "priority": "high"},
+    {"week": 2, "day": 2, "title": "Опрацювати коментарі до PR", "description": "Закрити питання щодо API docs, unit tests і migrations.", "type": "code_review", "status": "in_progress", "priority": "high"},
+    {"week": 2, "day": 4, "title": "Підготувати чекліст staging deployment", "description": "Пояснити deploy, monitor і rollback steps перед роботою з production.", "type": "deployment", "status": "todo", "priority": "high"},
+    {"week": 3, "day": 1, "title": "Поспостерігати за production deployment", "description": "Приєднатися до Victor для rollout status, monitoring у Grafana і rollback drill.", "type": "deployment", "status": "todo", "priority": "medium"},
+    {"week": 3, "day": 3, "title": "Задокументувати нотатки з першого PR", "description": "Зафіксувати architecture notes і gotchas для наступного новачка.", "type": "documentation", "status": "todo", "priority": "medium"},
 ]
 
 
@@ -469,7 +469,7 @@ def _persona(role: str, user: User, newcomer: NewcomerProfile | None = None) -> 
         "name": user.full_name,
         "email": user.email,
         "job_title": newcomer.job_title if newcomer else user.role,
-        "team": newcomer.team if newcomer else "Sales",
+        "team": newcomer.team if newcomer else "Продажі",
     }
 
 
@@ -827,9 +827,9 @@ def seed_demo_data(db: Session) -> dict:
     marina = NewcomerProfile(
         user_id=marina_user.id,
         mentor_id=mentor.id,
-        job_title="Sales Manager / BDR",
+        job_title="Менеджер з продажів / BDR",
         seniority="Junior",
-        team="Sales",
+        team="Продажі",
         start_date=date.today() - timedelta(days=10),
         onboarding_status="active",
     )
@@ -855,18 +855,18 @@ def seed_demo_data(db: Session) -> dict:
         db,
         newcomer=marina,
         mentor=mentor,
-        title="Marina Kovalenko - Sales/BDR Onboarding",
-        description="30-day plan focused on sales process, daily KPI discipline, CRM hygiene, and objection practice.",
-        goal="Make Marina ready to handle real cold and warm leads with clean CRM updates.",
+        title="Marina Kovalenko - онбординг продажів/BDR",
+        description="30-денний план із фокусом на процес продажів, щоденну дисципліну KPI, чистоту CRM і практику заперечень.",
+        goal="Підготувати Marina до роботи з реальними холодними й теплими лідами та чистими оновленнями CRM.",
         tasks=MARINA_TASKS,
     )
     tanya_plan, tanya_tasks = _create_plan(
         db,
         newcomer=tanya,
         mentor=mentor,
-        title="Tanya Petrova - Backend Developer Onboarding",
-        description="30-day plan focused on payments architecture, first PR, review quality, and deployment readiness.",
-        goal="Make Tanya confident to ship a backend PR and safely participate in staging deployment.",
+        title="Tanya Petrova - онбординг Backend Developer",
+        description="30-денний план із фокусом на архітектуру payments, перший PR, якість review і готовність до deployment.",
+        goal="Зробити Tanya впевненою у випуску backend PR і безпечній участі в staging deployment.",
         tasks=TANYA_TASKS,
     )
 
@@ -878,12 +878,12 @@ def seed_demo_data(db: Session) -> dict:
             user_id=marina_user.id,
             blocker_type="crm_kpi_confusion",
             details=(
-                "Marina is unsure how to map Instagram/Facebook conversations into the KPI tracker "
-                "and has not updated plan/fact rows for two days."
+                "Marina не впевнена, як переносити розмови з Instagram/Facebook у KPI tracker "
+                "і вже два дні не оновлювала рядки план/факт."
             ),
             ai_suggestion=(
-                "Schedule a 15-minute CRM hygiene walkthrough, then give Marina one clean example "
-                "for each source before the next outreach block."
+                "Заплануйте 15-хвилинний walkthrough із чистоти CRM, потім дайте Marina по одному чистому прикладу "
+                "для кожного джерела перед наступним блоком outreach."
             ),
             status="open",
         )
@@ -896,10 +896,10 @@ def seed_demo_data(db: Session) -> dict:
         tone="attention",
         confidence=0.84,
         score=0.71,
-        title="PR review loop needs mentor attention",
-        description="Tanya opened the first backend PR, but review comments are clustering around tests and API documentation.",
-        evidence="- First PR is in progress.\n- Code review checklist was opened.\n- Questions mention tests, docs and migration expectations.",
-        suggested_action="Pair for 20 minutes on one review comment and ask Tanya to update the PR checklist before re-requesting review.",
+        title="Цикл PR review потребує уваги ментора",
+        description="Tanya відкрила перший backend PR, але коментарі review концентруються навколо tests і API documentation.",
+        evidence="- Перший PR у процесі.\n- Чекліст code review було відкрито.\n- Питання згадують tests, docs і очікування щодо migration.",
+        suggested_action="Попрацюйте разом 20 хвилин над одним коментарем review і попросіть Tanya оновити чекліст PR перед повторним запитом review.",
         status="open",
         occurrence_count=3,
         target_task_id=next(task.id for task in tanya_tasks if task.task_type == "code_review"),
@@ -911,10 +911,10 @@ def seed_demo_data(db: Session) -> dict:
         tone="attention",
         confidence=0.89,
         score=0.82,
-        title="Deployment readiness is not yet proven",
-        description="Tanya read the deployment guide but has not yet practiced rollout status, monitoring or rollback.",
-        evidence="- Deployment checklist task is still todo.\n- AI questions focus on staging, approvals and rollback.\n- Production deploy shadowing is scheduled later this week.",
-        suggested_action="Keep production deploy shadowing, but add a staging dry run with Victor before any release responsibility.",
+        title="Готовність до deployment ще не підтверджена",
+        description="Tanya прочитала посібник із deployment, але ще не практикувала rollout status, monitoring або rollback.",
+        evidence="- Завдання з deployment checklist досі todo.\n- AI-питання фокусуються на staging, approvals і rollback.\n- Спостереження за production deploy заплановане на цей тиждень.",
+        suggested_action="Залиште спостереження за production deploy, але додайте staging dry run з Victor перед будь-якою відповідальністю за release.",
         status="open",
         occurrence_count=4,
         target_task_id=next(task.id for task in tanya_tasks if task.title.startswith("Prepare staging")),
@@ -927,31 +927,31 @@ def seed_demo_data(db: Session) -> dict:
             newcomer_id=marina.id,
             plan_id=marina_plan.id,
             signal_id=None,
-            title="Adapt Marina Week 2: CRM and objection recovery",
+            title="Адаптувати тиждень 2 Marina: CRM і відновлення після заперечень",
             reason=(
-                "Marina is blocked on KPI/CRM discipline and is still shaky on price objections. "
-                "Reducing new outreach volume for one day creates room for practice and cleanup."
+                "Marina заблокована на дисципліні KPI/CRM і досі невпевнена із ціновими запереченнями. "
+                "Зменшення нового outreach на один день створить простір для практики й наведення ладу."
             ),
             suggested_changes=[
                 {
                     "action": "add_task",
-                    "title": "CRM hygiene walkthrough with Oleg",
-                    "description": "Walk through one Instagram, one Facebook and one Email lead from contact to KPI fact row.",
+                    "title": "Walkthrough із чистоти CRM з Oleg",
+                    "description": "Пройти один Instagram, один Facebook і один Email лід від контакту до фактичного рядка KPI.",
                     "task_type": "crm",
                     "week_number": 2,
                     "day_number": 2,
                     "priority": "high",
-                    "success_criteria": "Marina can update all KPI rows without mentor correction.",
+                    "success_criteria": "Marina може оновити всі рядки KPI без виправлень ментора.",
                 },
                 {
                     "action": "add_task",
-                    "title": "Objection practice: expensive and not now",
-                    "description": "Run two AI-client role plays using the objection playbook.",
+                    "title": "Практика заперечень: дорого і не зараз",
+                    "description": "Провести два role plays з AI-клієнтом за playbook заперечень.",
                     "task_type": "role_play",
                     "week_number": 2,
                     "day_number": 3,
                     "priority": "high",
-                    "success_criteria": "Marina handles both objections with problem-cost framing.",
+                    "success_criteria": "Marina опрацьовує обидва заперечення через framing вартості проблеми.",
                 },
             ],
             status="pending",
@@ -968,9 +968,9 @@ def seed_demo_data(db: Session) -> dict:
                 blocked_tasks=1,
                 open_signals=0,
                 progress_percent=38,
-                strengths=["ICP basics", "cold message drafting"],
-                gaps=["CRM discipline", "KPI plan/fact", "price objections"],
-                mentor_notes="Marina is promising but needs a concrete CRM example before more outreach volume.",
+                strengths=["Основи ICP", "чернетки холодних повідомлень"],
+                gaps=["Дисципліна CRM", "план/факт KPI", "цінові заперечення"],
+                mentor_notes="Marina має добрий потенціал, але потребує конкретного прикладу CRM перед збільшенням outreach.",
             ),
             ProgressSnapshot(
                 newcomer_id=tanya.id,
@@ -979,9 +979,9 @@ def seed_demo_data(db: Session) -> dict:
                 blocked_tasks=0,
                 open_signals=2,
                 progress_percent=52,
-                strengths=["architecture tracing", "first PR ownership"],
-                gaps=["review checklist depth", "deployment confidence"],
-                mentor_notes="Tanya is progressing well; the signals are attention items, not blockers.",
+                strengths=["простеження architecture", "відповідальність за перший PR"],
+                gaps=["глибина review checklist", "впевненість у deployment"],
+                mentor_notes="Tanya добре просувається; сигнали потребують уваги, але це не блокери.",
             ),
         ]
     )
@@ -990,7 +990,7 @@ def seed_demo_data(db: Session) -> dict:
     for payload in [
         (
             marina,
-            "Яка денна норма контактів для Sales Manager?",
+            "Яка денна норма контактів для менеджера з продажів?",
             "Денний план: Freelancehunt 20, Instagram 30, Facebook 40, Email 20, LinkedIn 10, Telegram 5; всього 125 контактів.",
             _find_doc(docs, "Щоденка"),
         ),
@@ -998,7 +998,7 @@ def seed_demo_data(db: Session) -> dict:
             marina,
             "Що відповідати, якщо клієнт каже що дорого?",
             "Не знижуйте ціну одразу. Переведіть розмову на вартість поточної проблеми і порахуйте час ментора або втрачений результат.",
-            _find_doc(docs, "Objections"),
+            _find_doc(docs, "Заперечення у продажах"),
         ),
         (
             marina,
@@ -1008,20 +1008,20 @@ def seed_demo_data(db: Session) -> dict:
         ),
         (
             tanya,
-            "How do I deploy my changes to staging?",
-            "Merge after 2 approvals, wait for CI, verify staging, then follow the deployment guide for production readiness.",
-            _find_doc(docs, "Deployment"),
+            "Як мені розгорнути свої зміни на staging?",
+            "Зробіть merge після 2 approvals, дочекайтеся CI, перевірте staging, потім дотримуйтеся посібника з deployment для готовності до production.",
+            _find_doc(docs, "deployment"),
         ),
         (
             tanya,
-            "Who approves payment-gateway changes?",
-            "Tech lead approval is mandatory for payment-gateway changes; Victor supports infrastructure questions.",
+            "Хто схвалює зміни в payment-gateway?",
+            "Для змін у payment-gateway обов'язкове схвалення tech lead; Victor допомагає з питаннями infrastructure.",
             _find_doc(docs, "Architecture"),
         ),
         (
             tanya,
-            "What should be in my PR description?",
-            "Include what changed, how to test it, and a Jira link. Make sure tests pass and API changes are documented.",
+            "Що має бути в описі мого PR?",
+            "Додайте, що змінилося, як це тестувати, і Jira link. Переконайтеся, що tests проходять, а API changes задокументовані.",
             _find_doc(docs, "Code Review"),
         ),
     ]:
@@ -1040,45 +1040,45 @@ def seed_demo_data(db: Session) -> dict:
             newcomer=marina,
             mentor=mentor,
             plan=marina_plan,
-            title="Sales Manager First Wins",
-            summary="A short role course for Marina covering outreach, CRM discipline, KPI reporting, and objection handling.",
+            title="Перші перемоги менеджера з продажів",
+            summary="Короткий рольовий курс для Marina про outreach, дисципліну CRM, звітність KPI і роботу із запереченнями.",
             role_target="sales_manager",
             source_docs=[
                 doc
                 for doc in [
-                    _find_doc(docs, "Sales Foundations"),
-                    _find_doc(docs, "Sales Objections"),
+                    _find_doc(docs, "Основи продажів"),
+                    _find_doc(docs, "Заперечення у продажах"),
                     _find_doc(docs, "KPI"),
                 ]
                 if doc
             ],
             lessons=[
                 {
-                    "title": "Map daily activity into clean CRM evidence",
-                    "summary": "Turn outreach activity into plan/fact rows, lead notes, and next steps Oleg can trust.",
+                    "title": "Перенести щоденну активність у чисті докази CRM",
+                    "summary": "Перетворити outreach-активність на рядки план/факт, нотатки щодо лідів і наступні кроки, яким Oleg може довіряти.",
                     "body": (
-                        "Start from the channel KPI, then record each meaningful dialogue with source, status, "
-                        "next step, and blocker. A clean CRM entry answers who the lead is, why they fit, what "
-                        "happened, and what happens next."
+                        "Почніть із KPI каналу, потім фіксуйте кожен змістовний діалог із джерелом, статусом, "
+                        "наступним кроком і блокером. Чистий запис CRM відповідає, хто цей лід, чому він підходить, що "
+                        "сталося і що буде далі."
                     ),
                     "takeaways": [
-                        "Track channel activity daily.",
-                        "Separate activity KPI from outcome KPI.",
-                        "Every warm lead needs a next step.",
+                        "Відстежуйте активність каналів щодня.",
+                        "Відокремлюйте activity KPI від outcome KPI.",
+                        "Кожен теплий лід потребує наступного кроку.",
                     ],
                 },
                 {
-                    "title": "Objection handling role-play",
-                    "summary": "Practice price, timing, and competitor objections before live outreach.",
+                    "title": "Role-play з опрацювання заперечень",
+                    "summary": "Потренуйте заперечення щодо ціни, таймінгу й конкурентів перед live outreach.",
                     "body": (
-                        "Do not discount on the first price objection. Reframe the conversation around the cost "
-                        "of the current onboarding problem, mentor time, and delayed productivity."
+                        "Не давайте знижку після першого цінового заперечення. Переформулюйте розмову навколо вартості "
+                        "поточної проблеми онбордингу, часу ментора й затриманої продуктивності."
                     ),
                     "video_url": "https://www.youtube.com/watch?v=ysz5S6PUM-U",
                     "takeaways": [
-                        "Acknowledge the concern.",
-                        "Ask one diagnostic question.",
-                        "Return to business impact.",
+                        "Визнайте занепокоєння.",
+                        "Поставте одне діагностичне питання.",
+                        "Поверніться до бізнес-впливу.",
                     ],
                 },
             ],
@@ -1088,44 +1088,44 @@ def seed_demo_data(db: Session) -> dict:
             newcomer=tanya,
             mentor=mentor,
             plan=tanya_plan,
-            title="Backend Developer Release Readiness",
-            summary="A focused course for Tanya covering the payments architecture, PR checklist, and staging deployment flow.",
+            title="Готовність Backend Developer до release",
+            summary="Сфокусований курс для Tanya про архітектуру payments, чекліст PR і staging deployment flow.",
             role_target="backend_developer",
             source_docs=[
                 doc
                 for doc in [
                     _find_doc(docs, "Architecture"),
-                    _find_doc(docs, "Code Review"),
-                    _find_doc(docs, "Deployment"),
+                    _find_doc(docs, "code review"),
+                    _find_doc(docs, "deployment"),
                 ]
                 if doc
             ],
             lessons=[
                 {
-                    "title": "Payments architecture map",
-                    "summary": "Understand the services Tanya touches before changing payment-gateway behavior.",
+                    "title": "Мапа архітектури Payments",
+                    "summary": "Зрозуміти сервіси, яких торкається Tanya, перед зміною поведінки payment-gateway.",
                     "body": (
-                        "Payments changes usually cross service boundaries. Before coding, identify the owning "
-                        "service, event contracts, database impact, and whether tech lead approval is required."
+                        "Зміни в Payments зазвичай перетинають межі сервісів. Перед coding визначте owning "
+                        "service, event contracts, вплив на database і чи потрібне схвалення tech lead."
                     ),
                     "takeaways": [
-                        "Payment-gateway changes require tech lead approval.",
-                        "Kafka events carry most internal service communication.",
-                        "Document API or migration changes in the PR.",
+                        "Зміни в payment-gateway потребують схвалення tech lead.",
+                        "Kafka events несуть більшість внутрішньої комунікації сервісів.",
+                        "Документуйте API або migration changes у PR.",
                     ],
                 },
                 {
-                    "title": "Open a review-ready backend PR",
-                    "summary": "Prepare the checklist, test notes, and staging verification plan before asking for review.",
+                    "title": "Відкрити backend PR, готовий до review",
+                    "summary": "Підготувати checklist, test notes і план перевірки staging перед запитом review.",
                     "body": (
-                        "A review-ready PR includes what changed, how to test it, the Jira link, migration notes, "
-                        "and evidence that CI and relevant unit tests passed."
+                        "Готовий до review PR містить, що змінилося, як це тестувати, Jira link, migration notes "
+                        "і доказ, що CI та релевантні unit tests пройшли."
                     ),
                     "video_url": "https://www.youtube.com/watch?v=ysz5S6PUM-U",
                     "takeaways": [
-                        "Use the PR checklist before requesting review.",
-                        "Verify staging after CI deploys.",
-                        "Escalate deployment uncertainty early.",
+                        "Використовуйте чекліст PR перед запитом review.",
+                        "Перевіряйте staging після CI deploy.",
+                        "Ескалуйте невпевненість щодо deployment завчасно.",
                     ],
                 },
             ],
@@ -1139,8 +1139,8 @@ def seed_demo_data(db: Session) -> dict:
             organizer_user_id=mentor.id,
             plan_id=marina_plan.id,
             task_id=blocked_task.id,
-            title="CRM hygiene unblock",
-            agenda="Map three real leads into KPI plan/fact rows and confirm the reporting habit.",
+            title="Розблокування чистоти CRM",
+            agenda="Перенести три реальні ліди в рядки план/факт KPI і підтвердити звичку звітності.",
             starts_at=now + timedelta(days=1, hours=2),
             ends_at=now + timedelta(days=1, hours=2, minutes=30),
             attendee_emails=[mentor.email, marina_user.email],
@@ -1151,8 +1151,8 @@ def seed_demo_data(db: Session) -> dict:
             newcomer_id=marina.id,
             organizer_user_id=mentor.id,
             plan_id=marina_plan.id,
-            title="Objection role-play: price and timing",
-            agenda="Practice two AI-client scenarios from the objection playbook.",
+            title="Role-play із заперечень: ціна і таймінг",
+            agenda="Потренувати два сценарії AI-клієнта з playbook заперечень.",
             starts_at=now + timedelta(days=3, hours=1),
             ends_at=now + timedelta(days=3, hours=1, minutes=45),
             attendee_emails=[mentor.email, marina_user.email, "katia@orynt.demo"],
@@ -1165,8 +1165,8 @@ def seed_demo_data(db: Session) -> dict:
             plan_id=tanya_plan.id,
             task_id=next(task.id for task in tanya_tasks if task.task_type == "code_review"),
             signal_id=tanya_signal_1.id,
-            title="First PR review pairing",
-            agenda="Resolve one test comment and one API documentation comment together.",
+            title="Парне review першого PR",
+            agenda="Разом закрити один коментар щодо test і один коментар щодо API documentation.",
             starts_at=now + timedelta(days=1, hours=5),
             ends_at=now + timedelta(days=1, hours=5, minutes=30),
             attendee_emails=[mentor.email, tanya_user.email],
@@ -1179,8 +1179,8 @@ def seed_demo_data(db: Session) -> dict:
             plan_id=tanya_plan.id,
             task_id=next(task.id for task in tanya_tasks if task.task_type == "deployment"),
             signal_id=tanya_signal_2.id,
-            title="Staging deployment dry run",
-            agenda="Run rollout status, monitoring checklist and rollback drill with Victor.",
+            title="Dry run staging deployment",
+            agenda="Пройти rollout status, monitoring checklist і rollback drill з Victor.",
             starts_at=now + timedelta(days=4, hours=3),
             ends_at=now + timedelta(days=4, hours=4),
             attendee_emails=[mentor.email, tanya_user.email, "victor@orynt.demo"],
@@ -1196,20 +1196,20 @@ def seed_demo_data(db: Session) -> dict:
             week_start=date.today() - timedelta(days=date.today().weekday()),
             week_end=date.today() - timedelta(days=date.today().weekday()) + timedelta(days=6),
             summary=(
-                "Marina needs CRM/KPI help before scaling outreach. Tanya is moving well, "
-                "but PR review and deployment readiness need attention this week."
+                "Marina потрібна допомога з CRM/KPI перед масштабуванням outreach. Tanya рухається добре, "
+                "але PR review і готовність до deployment потребують уваги цього тижня."
             ),
             highlights=[
-                "Marina completed ICP and outreach drafting.",
-                "Tanya traced payments architecture and opened a first PR.",
+                "Marina завершила ICP і підготовку outreach.",
+                "Tanya простежила архітектуру payments і відкрила перший PR.",
             ],
             risks=[
-                "Marina is blocked on KPI plan/fact reporting.",
-                "Tanya has not yet proven deployment readiness.",
+                "Marina заблокована на звітності план/факт KPI.",
+                "Tanya ще не підтвердила готовність до deployment.",
             ],
             recommended_actions=[
-                "Run Marina CRM hygiene unblock.",
-                "Keep Tanya staging dry run with Victor.",
+                "Провести розблокування чистоти CRM для Marina.",
+                "Залишити staging dry run Tanya з Victor.",
             ],
         )
     )
