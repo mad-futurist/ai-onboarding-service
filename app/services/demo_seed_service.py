@@ -917,7 +917,11 @@ def seed_demo_data(db: Session) -> dict:
         suggested_action="Залиште спостереження за production deploy, але додайте staging dry run з Victor перед будь-якою відповідальністю за release.",
         status="open",
         occurrence_count=4,
-        target_task_id=next(task.id for task in tanya_tasks if task.title.startswith("Prepare staging")),
+        target_task_id=next(
+            task.id
+            for task in tanya_tasks
+            if task.title.startswith("Prepare staging") or task.title.startswith("Підготувати чекліст staging")
+        ),
     )
     db.add_all([tanya_signal_1, tanya_signal_2])
     db.flush()
