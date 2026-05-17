@@ -5,7 +5,7 @@ from app.db.session import get_db
 from app.models.newcomer import NewcomerProfile
 from app.models.plan_adjustment import PlanAdjustmentSuggestion
 from app.schemas.plan_adjustment import (
-    PlanAdjustmentGenerateResponse,
+    PlanAdjustmentChangesUpdate,
     PlanAdjustmentRead,
     PlanAdjustmentStatusResponse,
 )
@@ -15,6 +15,7 @@ from app.services.plan_adjustment_service import (
     generate_adjustment_for_period,
     generate_adjustment_from_signal,
     reject_adjustment,
+    update_adjustment_changes,
 )
 
 
@@ -23,29 +24,19 @@ router = APIRouter(prefix="/plan-adjustments", tags=["Plan Adjustments"])
 
 @router.post(
     "/generate/from-signal/{signal_id}",
-    response_model=PlanAdjustmentGenerateResponse,
+    response_model=PlanAdjustmentRead,
 )
 def generate_plan_adjustment_from_signal(
     signal_id: int,
     db: Session = Depends(get_db),
 ):
     try:
-        adjustment = generate_adjustment_from_signal(
+        return generate_adjustment_from_signal(
             db=db,
             signal_id=signal_id,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-
-    return PlanAdjustmentGenerateResponse(
-        adjustment_id=adjustment.id,
-        newcomer_id=adjustment.newcomer_id,
-        plan_id=adjustment.plan_id,
-        signal_id=adjustment.signal_id,
-        title=adjustment.title,
-        status=adjustment.status,
-        suggested_changes_count=len(adjustment.suggested_changes or []),
-    )
 
 
 @router.post(
@@ -113,6 +104,27 @@ def get_plan_adjustment(
         .filter(PlanAdjustmentSuggestion.id == adjustment_id)
         .first()
     )
+
+    if not adjustment:
+        raise HTTPException(status_code=404, detail="Plan adjustment not found")
+
+    return adjustment
+
+
+@router.patch("/{adjustment_id}", response_model=PlanAdjustmentRead)
+def update_plan_adjustment_changes(
+    adjustment_id: int,
+    payload: PlanAdjustmentChangesUpdate,
+    db: Session = Depends(get_db),
+):
+    try:
+        adjustment = update_adjustment_changes(
+            db=db,
+            adjustment_id=adjustment_id,
+            suggested_changes=payload.suggested_changes,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
     if not adjustment:
         raise HTTPException(status_code=404, detail="Plan adjustment not found")

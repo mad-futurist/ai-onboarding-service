@@ -35,6 +35,7 @@ from app.models.course import Course
 from app.models.lesson import Lesson
 from app.models.scheduled_meeting import ScheduledMeeting
 from app.models.ai_question import AIQuestion, AIQuestionSource
+from app.models.ai_conversation import AIConversation
 from app.models.ai_signal import AISignal
 from app.models.onboarding_event import OnboardingEvent
 from app.models.plan_adjustment import PlanAdjustmentSuggestion

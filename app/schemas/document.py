@@ -55,6 +55,8 @@ class DocumentListItem(BaseModel):
     scope: str | None
     source_type: str | None = None
     external_url: str | None = None
+    is_recommended: bool = False
+    recommendation_reason: str | None = None
     created_at: datetime
 
     class Config:

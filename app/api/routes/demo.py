@@ -17,6 +17,7 @@ class SeedResponse(BaseModel):
     plan_id: int | None = None
     signal_id: int | None = None
     documents_created: int | None = None
+    courses_created: int | None = None
     tasks_created: int | None = None
     questions_created: int | None = None
     meetings_created: int | None = None

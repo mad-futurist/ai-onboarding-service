@@ -433,7 +433,7 @@ PEOPLE = [
 
 
 MARINA_TASKS = [
-    {"week": 1, "day": 1, "title": "Complete day-1 sales readiness assessment", "description": "Answer questions on ICP, outreach, CRM and objection handling.", "type": "assessment", "status": "done", "priority": "high"},
+    {"week": 1, "day": 1, "title": "Review sales onboarding baseline", "description": "Review ICP, outreach, CRM, and objection-handling expectations already captured during kickoff.", "type": "reading", "status": "done", "priority": "high"},
     {"week": 1, "day": 2, "title": "Read sales process and KPI regulation", "description": "Understand lead generation, diagnostic calls, proposal flow, and daily activity norms.", "type": "reading", "status": "done", "priority": "high"},
     {"week": 1, "day": 3, "title": "Write first cold outreach sequence", "description": "Draft three short messages for Facebook, Instagram and LinkedIn using the company ICP.", "type": "outreach", "status": "done", "priority": "high"},
     {"week": 1, "day": 4, "title": "Log daily KPI table accurately", "description": "Fill plan/fact for every source and attach repost links.", "type": "crm", "status": "blocked", "priority": "high"},
@@ -477,6 +477,7 @@ def _seed_response(
     *,
     already_seeded: bool = False,
     documents_created: int = 0,
+    courses_created: int = 0,
     tasks_created: int = 0,
     questions_created: int = 0,
     meetings_created: int = 0,
@@ -514,6 +515,7 @@ def _seed_response(
         "plan_id": first_plan.id if first_plan else None,
         "signal_id": first_signal.id if first_signal else None,
         "documents_created": documents_created,
+        "courses_created": courses_created,
         "tasks_created": tasks_created,
         "questions_created": questions_created,
         "meetings_created": meetings_created,
@@ -564,15 +566,15 @@ def _create_plan(
     goal: str,
     tasks: list[dict],
 ) -> tuple[OnboardingPlan, list[OnboardingTask]]:
-    today = date.today()
+    start = newcomer.start_date or date.today()
     plan = OnboardingPlan(
         newcomer_id=newcomer.id,
         mentor_id=mentor.id,
         title=title,
         description=description,
         period_label="First 30 days",
-        period_start=today,
-        period_end=today + timedelta(days=30),
+        period_start=start,
+        period_end=start + timedelta(days=29),
         goal=goal,
         status="active",
         generated_by_ai=True,
@@ -640,6 +642,52 @@ def _create_plan(
             )
         )
     return plan, created
+
+
+def _create_course(
+    db: Session,
+    *,
+    newcomer: NewcomerProfile,
+    mentor: User,
+    plan: OnboardingPlan,
+    title: str,
+    summary: str,
+    role_target: str,
+    source_docs: list[Document],
+    lessons: list[dict],
+) -> Course:
+    now = datetime.now(timezone.utc)
+    source_document_ids = [doc.id for doc in source_docs if doc]
+    course = Course(
+        plan_id=plan.id,
+        newcomer_id=newcomer.id,
+        mentor_id=mentor.id,
+        title=title,
+        summary=summary,
+        role_target=role_target,
+        status="published",
+        generated_by_ai=True,
+        source_document_ids=source_document_ids,
+        approved_at=now,
+        published_at=now,
+    )
+    db.add(course)
+    db.flush()
+
+    for index, item in enumerate(lessons, start=1):
+        db.add(
+            Lesson(
+                course_id=course.id,
+                index=index,
+                title=item["title"],
+                summary=item.get("summary"),
+                body=item.get("body"),
+                video_url=item.get("video_url"),
+                source_document_ids=item.get("source_document_ids", source_document_ids),
+                takeaways=item.get("takeaways"),
+            )
+        )
+    return course
 
 
 def _create_ai_question(
@@ -984,56 +1032,103 @@ def seed_demo_data(db: Session) -> dict:
         )
         questions_created += 1
 
-    _create_assessment(
-        db,
-        newcomer=marina,
-        mentor=mentor,
-        title="Sales readiness check",
-        questions=[
-            {
-                "type": "mcq",
-                "prompt": "What is the main purpose of the first cold outreach?",
-                "options": [
-                    {"id": "a", "label": "Close the deal immediately", "is_correct": False},
-                    {"id": "b", "label": "Get a reply and book a diagnostic call", "is_correct": True},
-                    {"id": "c", "label": "Send a full proposal", "is_correct": False},
-                ],
-                "skill_tag": "cold_outreach",
-                "difficulty": "easy",
-            },
-            {
-                "type": "short_answer",
-                "prompt": "Name three fields Marina should capture during a diagnostic call.",
-                "expected_answer": "Goals, business state, budget, problems, decision role, deadline or next step.",
-                "skill_tag": "discovery",
-            },
-        ],
-    )
-    _create_assessment(
-        db,
-        newcomer=tanya,
-        mentor=mentor,
-        title="Backend readiness check",
-        questions=[
-            {
-                "type": "mcq",
-                "prompt": "When does staging deploy trigger?",
-                "options": [
-                    {"id": "a", "label": "After CI passes on a merged PR", "is_correct": True},
-                    {"id": "b", "label": "Before code review", "is_correct": False},
-                    {"id": "c", "label": "Only manually on Fridays", "is_correct": False},
-                ],
-                "skill_tag": "deployment",
-                "difficulty": "medium",
-            },
-            {
-                "type": "short_answer",
-                "prompt": "What should a backend PR description include?",
-                "expected_answer": "What changed, how to test, and a Jira link; API or migration details if relevant.",
-                "skill_tag": "code_review",
-            },
-        ],
-    )
+    courses = [
+        _create_course(
+            db,
+            newcomer=marina,
+            mentor=mentor,
+            plan=marina_plan,
+            title="Sales Manager First Wins",
+            summary="A short role course for Marina covering outreach, CRM discipline, KPI reporting, and objection handling.",
+            role_target="sales_manager",
+            source_docs=[
+                doc
+                for doc in [
+                    _find_doc(docs, "Sales Foundations"),
+                    _find_doc(docs, "Sales Objections"),
+                    _find_doc(docs, "KPI"),
+                ]
+                if doc
+            ],
+            lessons=[
+                {
+                    "title": "Map daily activity into clean CRM evidence",
+                    "summary": "Turn outreach activity into plan/fact rows, lead notes, and next steps Oleg can trust.",
+                    "body": (
+                        "Start from the channel KPI, then record each meaningful dialogue with source, status, "
+                        "next step, and blocker. A clean CRM entry answers who the lead is, why they fit, what "
+                        "happened, and what happens next."
+                    ),
+                    "takeaways": [
+                        "Track channel activity daily.",
+                        "Separate activity KPI from outcome KPI.",
+                        "Every warm lead needs a next step.",
+                    ],
+                },
+                {
+                    "title": "Objection handling role-play",
+                    "summary": "Practice price, timing, and competitor objections before live outreach.",
+                    "body": (
+                        "Do not discount on the first price objection. Reframe the conversation around the cost "
+                        "of the current onboarding problem, mentor time, and delayed productivity."
+                    ),
+                    "video_url": "https://www.youtube.com/watch?v=ysz5S6PUM-U",
+                    "takeaways": [
+                        "Acknowledge the concern.",
+                        "Ask one diagnostic question.",
+                        "Return to business impact.",
+                    ],
+                },
+            ],
+        ),
+        _create_course(
+            db,
+            newcomer=tanya,
+            mentor=mentor,
+            plan=tanya_plan,
+            title="Backend Developer Release Readiness",
+            summary="A focused course for Tanya covering the payments architecture, PR checklist, and staging deployment flow.",
+            role_target="backend_developer",
+            source_docs=[
+                doc
+                for doc in [
+                    _find_doc(docs, "Architecture"),
+                    _find_doc(docs, "Code Review"),
+                    _find_doc(docs, "Deployment"),
+                ]
+                if doc
+            ],
+            lessons=[
+                {
+                    "title": "Payments architecture map",
+                    "summary": "Understand the services Tanya touches before changing payment-gateway behavior.",
+                    "body": (
+                        "Payments changes usually cross service boundaries. Before coding, identify the owning "
+                        "service, event contracts, database impact, and whether tech lead approval is required."
+                    ),
+                    "takeaways": [
+                        "Payment-gateway changes require tech lead approval.",
+                        "Kafka events carry most internal service communication.",
+                        "Document API or migration changes in the PR.",
+                    ],
+                },
+                {
+                    "title": "Open a review-ready backend PR",
+                    "summary": "Prepare the checklist, test notes, and staging verification plan before asking for review.",
+                    "body": (
+                        "A review-ready PR includes what changed, how to test it, the Jira link, migration notes, "
+                        "and evidence that CI and relevant unit tests passed."
+                    ),
+                    "video_url": "https://www.youtube.com/watch?v=ysz5S6PUM-U",
+                    "takeaways": [
+                        "Use the PR checklist before requesting review.",
+                        "Verify staging after CI deploys.",
+                        "Escalate deployment uncertainty early.",
+                    ],
+                },
+            ],
+        ),
+    ]
 
     now = datetime.now(timezone.utc)
     meetings = [
@@ -1122,6 +1217,7 @@ def seed_demo_data(db: Session) -> dict:
     return _seed_response(
         db,
         documents_created=len(docs),
+        courses_created=len(courses),
         tasks_created=len(marina_tasks) + len(tanya_tasks),
         questions_created=questions_created,
         meetings_created=len(meetings),

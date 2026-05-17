@@ -480,6 +480,31 @@ def generate_adjustment_from_signal(
     return adjustment
 
 
+def update_adjustment_changes(
+    db: Session,
+    adjustment_id: int,
+    suggested_changes: list[dict],
+) -> PlanAdjustmentSuggestion | None:
+    adjustment = (
+        db.query(PlanAdjustmentSuggestion)
+        .filter(PlanAdjustmentSuggestion.id == adjustment_id)
+        .first()
+    )
+
+    if not adjustment:
+        return None
+
+    if adjustment.status != "pending":
+        raise ValueError("Only pending adjustments can be edited")
+
+    adjustment.suggested_changes = suggested_changes
+
+    db.commit()
+    db.refresh(adjustment)
+
+    return adjustment
+
+
 def approve_adjustment(
     db: Session,
     adjustment_id: int,
@@ -546,8 +571,9 @@ def apply_adjustment(
         action = change.get("action")
 
         if action in ("add_task", "add"):
+            target_plan_id = change.get("target_plan_id") or adjustment.plan_id
             task = OnboardingTask(
-                plan_id=adjustment.plan_id,
+                plan_id=target_plan_id,
                 title=change.get("title"),
                 description=change.get("description"),
                 week_number=change.get("week_number"),

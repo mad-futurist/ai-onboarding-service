@@ -8,7 +8,7 @@ from app.schemas.document import DocumentListItem
 from app.services.newcomer_kb_service import get_documents_for_newcomer, get_document_with_chunk_count
 from app.services.rag_service import ask_ai_with_sources
 from app.services.mindmap_service import generate_mindmap_for_document
-from app.schemas.ai_question import AIAskResponse
+from app.schemas.ai_question import AIAskResponse, AISourceRead
 
 router = APIRouter(prefix="/newcomer-kb", tags=["Newcomer Knowledge Base"])
 
@@ -46,6 +46,7 @@ class NewcomerDocumentRead(BaseModel):
 class DocumentAskRequest(BaseModel):
     question: str
     user_id: int | None = None
+    conversation_id: int | None = None
 
 
 @router.get("/{newcomer_id}/documents", response_model=list[DocumentListItem])
@@ -98,9 +99,27 @@ def ask_about_document(
         user_id=payload.user_id,
         newcomer_id=newcomer_id,
         top_k=4,
+        conversation_id=payload.conversation_id,
+        context_type="document",
+        context_id=document_id,
     )
 
-    return ai_question
+    return AIAskResponse(
+        question_id=ai_question.id,
+        question=ai_question.question,
+        answer=ai_question.answer,
+        conversation_id=ai_question.conversation_id,
+        sources=[
+            AISourceRead(
+                document_id=source.document_id,
+                chunk_id=source.chunk_id,
+                title=source.title,
+                content_preview=source.content_preview,
+                similarity=source.similarity,
+            )
+            for source in ai_question.sources
+        ],
+    )
 
 
 @router.post(

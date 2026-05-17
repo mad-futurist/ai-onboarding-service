@@ -50,3 +50,7 @@ class PlanAdjustmentStatusResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class PlanAdjustmentChangesUpdate(BaseModel):
+    suggested_changes: list[dict[str, Any]]

@@ -2,12 +2,14 @@ from dataclasses import dataclass
 
 import httpx
 from openai import OpenAI
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
 from app.models.ai_question import AIQuestion, AIQuestionSource
+from app.models.ai_conversation import AIConversation
 from app.services.chunking_service import split_text_into_chunks, estimate_tokens
 from app.services.embedding_service import create_embedding
 from app.services.event_logger import log_onboarding_event
@@ -175,12 +177,52 @@ Answer using only these sources.
     return response.output_text
 
 
+def _derive_conversation_title(question: str) -> str:
+    cleaned = question.strip().splitlines()[0] if question.strip() else "New conversation"
+    if len(cleaned) > 60:
+        return cleaned[:57].rstrip() + "…"
+    return cleaned or "New conversation"
+
+
+def _resolve_conversation(
+    db: Session,
+    question: str,
+    user_id: int | None,
+    newcomer_id: int | None,
+    conversation_id: int | None,
+    context_type: str | None,
+    context_id: int | None,
+) -> AIConversation:
+    if conversation_id is not None:
+        conversation = (
+            db.query(AIConversation)
+            .filter(AIConversation.id == conversation_id)
+            .first()
+        )
+        if conversation:
+            return conversation
+
+    conversation = AIConversation(
+        user_id=user_id,
+        newcomer_id=newcomer_id,
+        title=_derive_conversation_title(question),
+        context_type=context_type,
+        context_id=context_id,
+    )
+    db.add(conversation)
+    db.flush()
+    return conversation
+
+
 def ask_ai_with_sources(
     db: Session,
     question: str,
     user_id: int | None = None,
     newcomer_id: int | None = None,
     top_k: int = 4,
+    conversation_id: int | None = None,
+    context_type: str | None = None,
+    context_id: int | None = None,
 ) -> AIQuestion:
     retrieved_chunks = retrieve_relevant_chunks(
         db=db,
@@ -193,9 +235,20 @@ def ask_ai_with_sources(
         retrieved_chunks=retrieved_chunks,
     )
 
+    conversation = _resolve_conversation(
+        db=db,
+        question=question,
+        user_id=user_id,
+        newcomer_id=newcomer_id,
+        conversation_id=conversation_id,
+        context_type=context_type,
+        context_id=context_id,
+    )
+
     ai_question = AIQuestion(
         user_id=user_id,
         newcomer_id=newcomer_id,
+        conversation_id=conversation.id,
         question=question,
         answer=answer,
         status="answered",
@@ -203,6 +256,9 @@ def ask_ai_with_sources(
 
     db.add(ai_question)
     db.flush()
+
+    # Touch the conversation so it floats to the top of the history list.
+    conversation.updated_at = func.now()
 
     for item in retrieved_chunks:
         chunk = item.chunk
