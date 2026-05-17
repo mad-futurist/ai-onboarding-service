@@ -1074,7 +1074,7 @@ def seed_demo_data(db: Session) -> dict:
                         "Не давайте знижку після першого цінового заперечення. Переформулюйте розмову навколо вартості "
                         "поточної проблеми онбордингу, часу ментора й затриманої продуктивності."
                     ),
-                    "video_url": "https://www.youtube.com/watch?v=ysz5S6PUM-U",
+                    "video_url": "https://www.youtube.com/watch?v=X7oxXhfwv40",
                     "takeaways": [
                         "Визнайте занепокоєння.",
                         "Поставте одне діагностичне питання.",
@@ -1121,7 +1121,7 @@ def seed_demo_data(db: Session) -> dict:
                         "Готовий до review PR містить, що змінилося, як це тестувати, Jira link, migration notes "
                         "і доказ, що CI та релевантні unit tests пройшли."
                     ),
-                    "video_url": "https://www.youtube.com/watch?v=ysz5S6PUM-U",
+                    "video_url": "https://www.youtube.com/watch?v=X7oxXhfwv40",
                     "takeaways": [
                         "Використовуйте чекліст PR перед запитом review.",
                         "Перевіряйте staging після CI deploy.",
