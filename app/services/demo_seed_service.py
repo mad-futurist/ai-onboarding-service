@@ -5,6 +5,7 @@ from datetime import date, datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 
 from app.models.ai_answer_feedback import AIAnswerFeedback
+from app.models.ai_conversation import AIConversation
 from app.models.ai_question import AIQuestion, AIQuestionSource
 from app.models.ai_signal import AISignal
 from app.models.ai_signal_feedback import AISignalFeedback
@@ -797,6 +798,7 @@ def reset_demo_data(db: Session) -> dict:
             CompanyOnboardingGap,
             Assessment,
             AIQuestion,
+            AIConversation,
             DocumentChunk,
             Document,
             PersonContact,

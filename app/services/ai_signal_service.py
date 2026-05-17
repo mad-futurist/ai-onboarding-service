@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.ai_question import AIQuestion
@@ -7,6 +8,7 @@ from app.models.ai_signal import AISignal
 from app.models.newcomer import NewcomerProfile
 from app.models.onboarding_plan import OnboardingPlan
 from app.models.onboarding_task import OnboardingTask
+from app.models.task_comment import TaskComment
 from app.services.feature_service import compute_newcomer_features
 from app.services.signal_scoring_service import score_all_signals
 from app.services.signal_scoring_service import SignalScoreResult
@@ -626,6 +628,132 @@ def detect_steady_progress_signal(
     return upsert_signal(db=db, newcomer_id=newcomer_id, score_result=score_result)
 
 
+def detect_task_review_bounce(
+    db: Session,
+    newcomer_id: int,
+    tasks: list[OnboardingTask],
+) -> SignalDetection | None:
+    if not tasks:
+        return None
+
+    task_ids = [task.id for task in tasks]
+    bounce_counts = dict(
+        db.query(TaskComment.task_id, func.count(TaskComment.id))
+        .filter(
+            TaskComment.task_id.in_(task_ids),
+            TaskComment.comment_type == "review_return",
+        )
+        .group_by(TaskComment.task_id)
+        .all()
+    )
+
+    bounced = [
+        (task, bounce_counts[task.id])
+        for task in tasks
+        if bounce_counts.get(task.id, 0) >= 2
+    ]
+    if not bounced:
+        return None
+
+    bounced.sort(key=lambda pair: pair[1], reverse=True)
+    top_task, top_count = bounced[0]
+
+    evidence_lines = [
+        f'Task "{top_task.title}" was returned from review {top_count} times.'
+    ]
+    for task, count in bounced[1:4]:
+        evidence_lines.append(f'Task "{task.title}" returned {count} times.')
+
+    score_result = SignalScoreResult(
+        signal_type="task_review_bounce",
+        topic="task",
+        score=min(0.6 + 0.1 * top_count, 0.95),
+        confidence=0.85,
+        severity="high",
+        tone="critical",
+        title="Task bounced from review repeatedly",
+        description=(
+            "A task has been sent back from review at least twice. The newcomer "
+            "may need pairing or clarification on acceptance criteria."
+        ),
+        evidence_lines=evidence_lines,
+        suggested_action=(
+            "Pair on the task in real time, clarify acceptance criteria, and decide "
+            "whether to break the task into smaller deliverables."
+        ),
+        target_scope="task",
+        target_week_id=top_task.week_id,
+        target_task_id=top_task.id,
+    )
+    return upsert_signal(
+        db=db,
+        newcomer_id=newcomer_id,
+        score_result=score_result,
+    )
+
+
+def detect_task_stuck_in_review(
+    db: Session,
+    newcomer_id: int,
+    tasks: list[OnboardingTask],
+    *,
+    stuck_after_days: int = 3,
+) -> SignalDetection | None:
+    in_review_tasks = [task for task in tasks if task.status == "in_review"]
+    if not in_review_tasks:
+        return None
+
+    now = datetime.now(timezone.utc)
+    stale: list[tuple[OnboardingTask, int]] = []
+    for task in in_review_tasks:
+        if not task.updated_at:
+            continue
+        updated = task.updated_at
+        if updated.tzinfo is None:
+            updated = updated.replace(tzinfo=timezone.utc)
+        days = (now - updated).days
+        if days >= stuck_after_days:
+            stale.append((task, days))
+
+    if not stale:
+        return None
+
+    stale.sort(key=lambda pair: pair[1], reverse=True)
+    top_task, top_days = stale[0]
+
+    evidence_lines = [
+        f'Task "{top_task.title}" has been in review for {top_days} day(s).'
+    ]
+    for task, days in stale[1:4]:
+        evidence_lines.append(f'Task "{task.title}" — {days} day(s) in review.')
+
+    score_result = SignalScoreResult(
+        signal_type="task_stuck_in_review",
+        topic="task",
+        score=min(0.55 + 0.05 * top_days, 0.9),
+        confidence=0.8,
+        severity="medium",
+        tone="attention",
+        title="Task stuck in review",
+        description=(
+            "A submission has been waiting on review for several days. "
+            "The newcomer is blocked on mentor feedback."
+        ),
+        evidence_lines=evidence_lines,
+        suggested_action=(
+            "Review the submission today or schedule a 15-minute sync to unblock the newcomer."
+        ),
+        target_scope="task",
+        target_week_id=top_task.week_id,
+        target_task_id=top_task.id,
+    )
+    return upsert_signal(
+        db=db,
+        newcomer_id=newcomer_id,
+        score_result=score_result,
+    )
+
+
 def detect_plan_stall_signal(
     db: Session,
     newcomer_id: int,
@@ -714,6 +842,8 @@ def detect_signals_for_newcomer(
         detect_blocked_task_signal,
         detect_steady_progress_signal,
         detect_plan_stall_signal,
+        detect_task_review_bounce,
+        detect_task_stuck_in_review,
     ):
         detection = detector(db, newcomer_id, tasks)
         if detection is not None:

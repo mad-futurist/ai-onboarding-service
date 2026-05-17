@@ -54,6 +54,8 @@ from app.models.assessment import (
     AssessmentSubmission,
     AssessmentAnswer,
 )
+from app.models.task_comment import TaskComment
+from app.models.notification import Notification
 
 target_metadata = Base.metadata
 # other values from the config, defined by the needs of env.py,

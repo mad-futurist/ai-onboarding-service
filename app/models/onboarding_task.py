@@ -54,3 +54,10 @@ class OnboardingTask(Base):
     )
 
     week = relationship("Week", back_populates="tasks")
+
+    comments = relationship(
+        "TaskComment",
+        back_populates="task",
+        cascade="all, delete-orphan",
+        order_by="TaskComment.created_at.desc()",
+    )

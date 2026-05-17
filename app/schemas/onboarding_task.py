@@ -86,3 +86,40 @@ class OnboardingTaskRead(BaseModel):
 
 class OnboardingTaskStatusUpdate(BaseModel):
     status: str
+    comment: str | None = None
+    actor_user_id: int | None = None
+
+
+class TaskCommentCreate(BaseModel):
+    body: str
+    comment_type: str = "general"
+    author_user_id: int | None = None
+
+
+class TaskCommentRead(BaseModel):
+    id: int
+    task_id: int
+    author_user_id: int | None
+    body: str
+    comment_type: str
+    from_status: str | None = None
+    to_status: str | None = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class NotificationRead(BaseModel):
+    id: int
+    user_id: int
+    type: str
+    title: str
+    body: str
+    related_task_id: int | None = None
+    related_comment_id: int | None = None
+    read_at: datetime | None = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

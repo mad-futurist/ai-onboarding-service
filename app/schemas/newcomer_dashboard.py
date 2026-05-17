@@ -42,6 +42,7 @@ class NewcomerDashboardProgress(BaseModel):
     total_tasks: int
     completed_tasks: int
     in_progress_tasks: int
+    in_review_tasks: int = 0
     blocked_tasks: int
     todo_tasks: int
     progress_percent: int

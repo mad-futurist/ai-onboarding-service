@@ -73,6 +73,7 @@ def compute_progress(
     total_tasks = len(tasks)
     completed_tasks = len([task for task in tasks if task.status == "done"])
     in_progress_tasks = len([task for task in tasks if task.status == "in_progress"])
+    in_review_tasks = len([task for task in tasks if task.status == "in_review"])
     blocked_tasks = len([task for task in tasks if task.status == "blocked"])
     todo_tasks = len([task for task in tasks if task.status == "todo"])
 
@@ -85,6 +86,7 @@ def compute_progress(
         "total_tasks": total_tasks,
         "completed_tasks": completed_tasks,
         "in_progress_tasks": in_progress_tasks,
+        "in_review_tasks": in_review_tasks,
         "blocked_tasks": blocked_tasks,
         "todo_tasks": todo_tasks,
         "progress_percent": progress_percent,

@@ -3,18 +3,24 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.db.session import get_db
 from app.models.document import Document
+from app.models.newcomer import NewcomerProfile
 from app.models.onboarding_plan import OnboardingPlan
 from app.models.onboarding_task import OnboardingTask
+from app.models.task_comment import TaskComment
 from app.models.week import Week
 from app.schemas.document import DocumentListItem
 from app.schemas.ai_question import AIQuestionRead
 from app.schemas.onboarding_task import (
+    NotificationRead,
     OnboardingTaskCreate,
     OnboardingTaskPlanCreate,
     OnboardingTaskRead,
     OnboardingTaskStatusUpdate,
     OnboardingTaskUpdate,
+    TaskCommentCreate,
+    TaskCommentRead,
 )
+from app.services.notification_service import create_notification
 from app.schemas.ai_plan_partial import (
     TaskAIGenerateRequest,
     TaskAISuggestRequest,
@@ -248,6 +254,17 @@ def get_task(
     return task
 
 
+ALLOWED_TASK_STATUSES = ["todo", "in_progress", "in_review", "done", "blocked"]
+
+ALLOWED_STATUS_TRANSITIONS: dict[str, set[str]] = {
+    "todo": {"in_progress", "blocked"},
+    "in_progress": {"in_review", "blocked", "done", "todo"},
+    "in_review": {"done", "in_progress", "blocked"},
+    "blocked": {"in_progress", "todo"},
+    "done": {"in_progress"},
+}
+
+
 @router.patch("/{task_id}/status", response_model=OnboardingTaskRead)
 def update_task_status(
     task_id: int,
@@ -256,7 +273,11 @@ def update_task_status(
 ):
     task = (
         db.query(OnboardingTask)
-        .options(joinedload(OnboardingTask.plan))
+        .options(
+            joinedload(OnboardingTask.plan).joinedload(
+                OnboardingPlan.newcomer
+            )
+        )
         .filter(OnboardingTask.id == task_id)
         .first()
     )
@@ -264,16 +285,70 @@ def update_task_status(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    allowed_statuses = ["todo", "in_progress", "done", "blocked"]
-
-    if payload.status not in allowed_statuses:
+    if payload.status not in ALLOWED_TASK_STATUSES:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid status. Allowed values: {allowed_statuses}",
+            detail=f"Invalid status. Allowed values: {ALLOWED_TASK_STATUSES}",
         )
 
     old_status = task.status
+
+    if old_status != payload.status:
+        allowed_next = ALLOWED_STATUS_TRANSITIONS.get(old_status, set())
+        if payload.status not in allowed_next:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Invalid transition {old_status} -> {payload.status}. "
+                    f"Allowed: {sorted(allowed_next)}"
+                ),
+            )
+
+    is_return_from_review = (
+        old_status == "in_review" and payload.status == "in_progress"
+    )
+
+    if is_return_from_review and not (payload.comment and payload.comment.strip()):
+        raise HTTPException(
+            status_code=400,
+            detail="A comment is required when returning a task from review.",
+        )
+
     task.status = payload.status
+
+    review_comment: TaskComment | None = None
+    if payload.comment and payload.comment.strip():
+        review_comment = TaskComment(
+            task_id=task.id,
+            author_user_id=payload.actor_user_id,
+            body=payload.comment.strip(),
+            comment_type=(
+                "review_return" if is_return_from_review else "status_change"
+            ),
+            from_status=old_status,
+            to_status=payload.status,
+        )
+        db.add(review_comment)
+        db.flush()
+
+    if is_return_from_review and task.plan and task.plan.newcomer:
+        newcomer = task.plan.newcomer
+        if newcomer.user_id:
+            create_notification(
+                db,
+                user_id=newcomer.user_id,
+                type="task_returned_from_review",
+                title=f"Task returned for changes: {task.title}",
+                body=(
+                    review_comment.body
+                    if review_comment is not None
+                    else "Your mentor returned this task for changes."
+                ),
+                related_task_id=task.id,
+                related_comment_id=(
+                    review_comment.id if review_comment is not None else None
+                ),
+            )
 
     topic = classify_topic(
         f"{task.title} {task.description or ''} {task.task_type}"
@@ -283,7 +358,7 @@ def update_task_status(
         log_onboarding_event(
             db=db,
             newcomer_id=task.plan.newcomer_id,
-            user_id=None,
+            user_id=payload.actor_user_id,
             event_type="task_status_changed",
             entity_type="onboarding_task",
             entity_id=task.id,
@@ -293,6 +368,8 @@ def update_task_status(
                 "task_title": task.title,
                 "old_status": old_status,
                 "new_status": payload.status,
+                "comment_id": review_comment.id if review_comment else None,
+                "is_return_from_review": is_return_from_review,
             },
         )
 
@@ -300,6 +377,46 @@ def update_task_status(
     db.refresh(task)
 
     return task
+
+
+@router.get("/{task_id}/comments", response_model=list[TaskCommentRead])
+def list_task_comments(
+    task_id: int,
+    db: Session = Depends(get_db),
+):
+    task = db.query(OnboardingTask).filter(OnboardingTask.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return (
+        db.query(TaskComment)
+        .filter(TaskComment.task_id == task_id)
+        .order_by(TaskComment.created_at.desc())
+        .all()
+    )
+
+
+@router.post("/{task_id}/comments", response_model=TaskCommentRead)
+def create_task_comment(
+    task_id: int,
+    payload: TaskCommentCreate,
+    db: Session = Depends(get_db),
+):
+    task = db.query(OnboardingTask).filter(OnboardingTask.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if not payload.body or not payload.body.strip():
+        raise HTTPException(status_code=400, detail="Comment body is required.")
+
+    comment = TaskComment(
+        task_id=task_id,
+        author_user_id=payload.author_user_id,
+        body=payload.body.strip(),
+        comment_type=payload.comment_type or "general",
+    )
+    db.add(comment)
+    db.commit()
+    db.refresh(comment)
+    return comment
 
 
 @router.patch("/{task_id}", response_model=OnboardingTaskRead)
