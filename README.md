@@ -1,3 +1,15 @@
+<div align="center">
+
+### 🌐 Language / Мова
+
+[🇬🇧 English](#english-version) &nbsp;·&nbsp; [🇺🇦 Українська](#українська-версія)
+
+</div>
+
+---
+
+<a name="english-version"></a>
+
 <p align="center">
   <img src="docs/logo.svg" alt="ReadySet.AI" width="320" />
 </p>
@@ -230,7 +242,17 @@ Deployed on **Render**.
 Live API: [ai-onboarding-service.onrender.com](https://ai-onboarding-service.onrender.com).
 
 ---
+
+<div align="right">
+
+[🔝 Back to top](#english-version) &nbsp;·&nbsp; [🇺🇦 Українська](#українська-версія)
+
+</div>
+
 ---
+---
+
+<a name="українська-версія"></a>
 
 <p align="center">
   <img src="docs/logo.svg" alt="ReadySet.AI" width="320" />
@@ -239,14 +261,22 @@ Live API: [ai-onboarding-service.onrender.com](https://ai-onboarding-service.onr
 <h1 align="center" style="color:#CC5500">ReadySet.AI — Сервіс онбордингу · Backend</h1>
 
 <p align="center">
+  <a href="https://github.com/mad-futurist/ai-onboarding-service"><img alt="backend" src="https://img.shields.io/badge/Backend-FastAPI-FF8C00?style=for-the-badge&labelColor=3D2000"/></a>
+  <a href="https://github.com/mad-futurist/ai-onboarding-service-frontend"><img alt="frontend" src="https://img.shields.io/badge/Frontend-Next.js%2016-CC5500?style=for-the-badge&labelColor=3D2000"/></a>
+  <a href="https://ai-onboarding-service.onrender.com"><img alt="api" src="https://img.shields.io/badge/API-Render-FFAA55?style=for-the-badge&labelColor=3D2000"/></a>
+</p>
+
+<p align="center">
   <b>Backend репо:</b> <a href="https://github.com/mad-futurist/ai-onboarding-service">github.com/mad-futurist/ai-onboarding-service</a><br/>
   <b>Frontend репо:</b> <a href="https://github.com/mad-futurist/ai-onboarding-service-frontend">github.com/mad-futurist/ai-onboarding-service-frontend</a><br/>
-  <b>Live API:</b> <a href="https://ai-onboarding-service.onrender.com">ai-onboarding-service.onrender.com</a>
+  <b>Live API:</b> <a href="https://ai-onboarding-service.onrender.com">ai-onboarding-service.onrender.com</a> &nbsp;·&nbsp; <b>Live app:</b> <a href="https://ai-onboarding-service-frontend.vercel.app">ai-onboarding-service-frontend.vercel.app</a>
 </p>
 
 ---
 
 > **ReadySet.AI Backend** — це FastAPI-сервіс, який живить AI-асистента онбордингу. Він перетворює документацію компанії на role-aware знання, генерує плани 30/60/90 на основі документів, слухає поведінкові сигнали і тримає ментора в циклі прийняття рішень.
+
+Цей репозиторій — **backend**. Next.js frontend знаходиться в [`ai-onboarding-service-frontend`](https://github.com/mad-futurist/ai-onboarding-service-frontend).
 
 ---
 
@@ -260,13 +290,13 @@ Live API: [ai-onboarding-service.onrender.com](https://ai-onboarding-service.onr
 
 | # | Функція | Чому це важливо |
 |---|---|---|
-| 1 | **AI-копілот під контролем людини** | Кожен AI-вихід зберігається як редагований артефакт зі статусом `proposed → reviewed → applied`. Без тихого авто-застосування. |
-| 2 | **AI live (стрімінг)** | Генерація плану, Ask AI та пояснення сигналів стрімляться інкрементально. |
-| 3 | **Генерація плану під роль + документи** | `ai_plan_service` будує план фаза за фазою з ролі новачка та обраних документів. Вихід валідується pydantic-схемами. |
-| 4 | **Сигнали — спочатку роль, потім запитання** | `ai_signals` стартують від milestone-ів ролі, далі — поведінкові сигнали (повторювані запитання, заблоковані задачі). Кожен сигнал зберігає **докази**. |
-| 5 | **AI-сигнали зі скорінгом і доказами** | Зважений скоринг + посилання на події, що тригернули сигнал. |
-| 6 | **Генерація курсів із контролем** | Маршрут `courses` створює чернетку з обраних джерел, ментор схвалює перед публікацією. |
-| 7 | **RAG Ask AI** | `knowledge` + `document_chunks` + `embedding_service`: чанки, pgvector cosine search, відповіді з цитатами. |
+| 1 | **AI-копілот під контролем людини** | Кожен AI-вихід зберігається як редагований, переглядуваний артефакт (плани, adjustments, чернетки курсів, сигнали). API примусово застосовує lifecycle статусів: `proposed → reviewed → applied`. Без тихого авто-застосування. |
+| 2 | **AI live (стрімінг)** | Генерація плану, Ask AI та пояснення сигналів стрімляться інкрементально — frontend рендерить токени по мірі їх надходження. |
+| 3 | **Генерація плану під роль + документи** | `ai_plan_service` будує план 30/60/90 фаза за фазою з профілю ролі новачка та обраного підмножини документів. Промпти обмежені, вихід валідується pydantic-схемами. |
+| 4 | **Сигнали — спочатку роль, потім запитання** | `ai_signals` стартують від milestone-ів очікуваної ролі; потім — поведінкові сигнали (повторювані запитання, заблоковані задачі, review-патерни). Кожен сигнал зберігає **чанки-докази** для аудиту ментором. |
+| 5 | **AI-сигнали зі скорінгом і доказами** | `e75c48a6f8c0_add_scoring_fields_to_ai_signals` — сигнали містять зважені оцінки та посилання на джерельні події, що їх тригернули. |
+| 6 | **Генерація курсів із контролем ментора** | Маршрут `courses` генерує короткий курс з обраних джерел, зберігає чернетку, вимагає схвалення ментора перед публікацією. |
+| 7 | **RAG Ask AI** | `knowledge` + `document_chunks` + `embedding_service`: чанкування документів, pgvector cosine search, відповіді на основі промптів із цитатами джерел у payload відповіді. |
 
 ---
 
@@ -274,24 +304,24 @@ Live API: [ai-onboarding-service.onrender.com](https://ai-onboarding-service.onr
 
 - **Користувачі, люди, новачки** — акаунти, профілі ролей, зв'язки mentor ↔ newcomer.
 - **Плани онбордингу і задачі** — фази (1–24+), задачі, критерії успіху, переходи статусів.
-- **Kanban / черга рев'ю ментора** — `mentor_kanban`.
-- **Снапшоти прогресу** — `progress_snapshots`.
-- **Document service** — upload, chunking, embeddings, типізовані документи.
-- **Нотифікації** — `notifications`, в межах ролі.
-- **Events firehose** — `onboarding_events` для аналітики й сигналів.
+- **Kanban / черга рев'ю ментора** — `mentor_kanban` для черги submission-ів новачків.
+- **Снапшоти прогресу** — `progress_snapshots` відстежують momentum з часом.
+- **Document service** — upload, store, chunk, embed; типізовані документи (HR, process, technical…).
+- **Нотифікації** — маршрут `notifications`, в межах ролі.
+- **Events firehose** — повний лог подій (`onboarding_events`) для аналітики й сигналів.
 - **Mentor digests** — періодичні AI-зведення для ментора.
 
 ---
 
 ## ✨ Додаткові функції
 
-- **Календар / зустрічі** — `meetings`, спільні mentor ↔ newcomer.
-- **Відео у курсах** — вбудовування відеоуроків.
+- **Календар / зустрічі** — маршрут `meetings`, спільний для mentor і newcomer.
+- **Відео у курсах** — курси можуть вбудовувати відеоуроки (lesson notes service).
 - **Інтеграції Teams / Slack** *(roadmap)*.
-- **Mind map** — Ask AI повертає payload графа для `@xyflow/react`.
-- **Skill checks / assessments** — швидкий тест для нового найму, який тригерить генерацію плану.
-- **Blocked reports** — новачок позначає задачу як заблоковану.
-- **Company gaps** — патерни через багатьох новачків.
+- **Mind map** — Ask AI відповіді включають graph payload, який споживає `@xyflow/react` рендерер на frontend.
+- **Skill checks / assessments** — маршрут `assessments` генерує швидкий тест для нового найму; результати тригерять генерацію плану.
+- **Blocked reports** — новачки можуть позначити задачу як заблоковану; з'являється в сигналах ментора.
+- **Company onboarding gaps** — `company_gaps` агрегує патерни по всіх новачках.
 
 ---
 
@@ -301,30 +331,38 @@ Live API: [ai-onboarding-service.onrender.com](https://ai-onboarding-service.onr
 
 | Шар | Технології |
 |---|---|
-| Web | **FastAPI** + pydantic v2 |
+| Web framework | **FastAPI** + pydantic v2 |
 | ORM / БД | **SQLAlchemy 2** + **PostgreSQL 16** + **pgvector** |
 | Міграції | **Alembic** |
-| LLM | **OpenAI** через `llm_service` |
-| Embeddings | `pgvector` (cosine) |
-| Сервер | **Uvicorn**, CORS до Next.js |
+| LLM | **OpenAI** (chat + embeddings) через `llm_service` |
+| Embeddings store | `pgvector` (cosine), таблиця `document_chunks` |
+| Сервер | **Uvicorn** (ASGI), CORS middleware для Next.js host |
 | Контейнер | `docker-compose.yml` (pgvector/pgvector:pg16) |
-| Деплой | **Render** |
+| Деплой | **Render** (web service) |
 
 ### RAG-пайплайн
 
 ```
 Upload документа
-   └─► chunking_service        (split з урахуванням токенів)
-         └─► embedding_service (OpenAI → pgvector)
-                  └─► retrieval (cosine kNN)
+   └─► chunking_service        (token-aware splits, зі збереженням metadata)
+         └─► embedding_service (OpenAI embeddings → pgvector)
+                  └─► retrieval (cosine kNN по document_chunks)
                             └─► збір промту (system + чанки + user)
                                       └─► llm_service (chat + streaming)
-                                              └─► структурований вихід (pydantic)
-                                                    └─► артефакт (status=proposed)
-                                                          └─► рев'ю ментора
+                                              └─► структурований вихід
+                                                    (валідація pydantic)
+                                                       └─► збережений артефакт
+                                                             (status=proposed)
+                                                                  └─► рев'ю ментора
 ```
 
-Кожен AI-артефакт зберігає: id шаблону промту, використані чанки, статус (`proposed | reviewed | applied | rejected`) і рішення ментора. Завдяки цьому система повністю аудитована.
+Кожен AI-артефакт (план, курс, сигнал, adjustment, відповідь) містить:
+- id **шаблону промту** (`app/prompts/*.txt`),
+- використані **source chunks**,
+- **статус** (`proposed | reviewed | applied | rejected`),
+- поле **рішення ментора** після дії.
+
+Саме це робить систему аудитованою наскрізь.
 
 ### Архітектура
 
@@ -335,17 +373,122 @@ Upload документа
 [ Next.js (Vercel) ]  ── /api/* проксі ──►  [ FastAPI (Render) ]
                                                   │
                                                   ├─ PostgreSQL + pgvector
-                                                  └─ OpenAI
+                                                  └─ OpenAI (chat + embeddings)
 ```
 
-Frontend ніколи не бачить OpenAI-ключ.
+Frontend ніколи не бачить OpenAI-ключ. Весь retrieval, збір промту і стрімінг відбуваються на backend.
+
+### Структура модулів
+
+```
+app/
+├── main.py                    # FastAPI app + CORS + реєстрація маршрутів
+├── core/                      # config, settings, security helpers
+├── db/                        # SQLAlchemy base, session, engine
+├── models/                    # ORM моделі (newcomer, plan, task, ai_signal, …)
+├── schemas/                   # pydantic IO схеми
+├── api/routes/                # FastAPI routers (один на ресурс)
+├── services/
+│   ├── ai_plan_service.py     # генерація плану (роль + доки → фази/задачі)
+│   ├── llm_service.py         # обгортка OpenAI client + streaming
+│   ├── embedding_service.py   # OpenAI embeddings → pgvector
+│   ├── chunking_service.py    # token-aware splitter документів
+│   ├── knowledge_recommendation_service.py  # surfacing пов'язаних документів
+│   ├── company_gap_service.py # виявлення патернів по всіх новачках
+│   ├── mentor_dashboard_service.py
+│   ├── mentor_digest_service.py
+│   ├── progress_snapshot_service.py
+│   ├── task_detail_service.py
+│   ├── person_contact_service.py
+│   └── event_logger.py        # firehose подій онбордингу
+└── prompts/                   # версіоновані шаблони промтів (plain .txt)
+```
+
+### Ключові маршрути
+
+`users`, `people`, `newcomers`, `documents`, `onboarding_plans`, `tasks`, `ai`, `ai_signals`, `onboarding_events`, `plan_adjustments`, `mentor_dashboard`, `newcomer_dashboard`, `blocked_reports`, `company_gaps`, `mentor_digests`, `mentor_actions`, `progress_snapshots`, `onboarding_reflections`, `newcomer_kb`, `user_story`, `knowledge`, `demo`, `courses`, `meetings`, `lesson_notes`, `assessments`, `notifications`, `mentor_kanban`.
+
+---
+
+## 🎨 Brand palette
+
+| Token | Hex |
+|---|---|
+| Blaze Orange | `#CC5500` |
+| Dark Orange | `#FF8C00` |
+| Sandy Orange | `#FFAA55` |
+| Peach | `#FFD199` |
+| Cream | `#FFF0E0` |
+| Warm White | `#FFF7F0` |
+| Warm Brown | `#7A5030` |
+| Deep Brown | `#3D2000` |
+| Obsidian | `#1A0E00` |
 
 ---
 
 ## 🚀 Локальний запуск
 
-Команди ті самі, що в англійському розділі вище. Після старту API — запустіть frontend ([інструкція](https://github.com/mad-futurist/ai-onboarding-service-frontend#-run-locally)).
+```powershell
+# 1. Postgres + pgvector
+docker compose up -d
 
-## 🌍 Продакшен
+# 2. Python env
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 
-Render для бекенду + Vercel для frontend. Не забудьте `CREATE EXTENSION IF NOT EXISTS vector;` після створення БД, і `alembic upgrade head` як release-команду.
+# 3. Env vars
+cp .env.example .env
+# заповніть:
+#   APP_NAME=ReadySet.AI
+#   APP_ENV=local
+#   DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/ai_onboarding
+#   OPENAI_API_KEY=sk-...
+#   OPENAI_MODEL=gpt-4o-mini
+#   EMBEDDING_MODEL=text-embedding-3-small
+#   CORS_ORIGINS=http://localhost:3000
+
+# 4. Міграції
+alembic upgrade head
+
+# 5. Запуск
+uvicorn app.main:app --reload
+# API → http://127.0.0.1:8000  ·  docs → http://127.0.0.1:8000/docs
+```
+
+Потім запустіть frontend (див. [frontend README](https://github.com/mad-futurist/ai-onboarding-service-frontend#-run-locally)).
+
+---
+
+## 🌍 Продакшен запуск
+
+Деплой на **Render**.
+
+1. **Web Service (Python)**
+   - Build: `pip install -r requirements.txt`
+   - Start: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+2. **Database** — підготуйте Postgres і увімкніть розширення:
+   ```sql
+   CREATE EXTENSION IF NOT EXISTS vector;
+   ```
+3. **Environment**
+   ```
+   APP_NAME=ReadySet.AI
+   APP_ENV=production
+   DATABASE_URL=postgresql+psycopg://...
+   OPENAI_API_KEY=sk-...
+   OPENAI_MODEL=gpt-4o-mini
+   EMBEDDING_MODEL=text-embedding-3-small
+   CORS_ORIGINS=https://ai-onboarding-service-frontend.vercel.app
+   ```
+4. **Міграції** — виконайте `alembic upgrade head` як release/predeploy команду.
+
+Live API: [ai-onboarding-service.onrender.com](https://ai-onboarding-service.onrender.com).
+
+---
+
+<div align="right">
+
+[🔝 На початок](#українська-версія) &nbsp;·&nbsp; [🇬🇧 English](#english-version)
+
+</div>
