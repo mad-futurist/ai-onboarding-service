@@ -30,6 +30,7 @@ from app.api.routes import lesson_notes
 from app.api.routes import assessments
 from app.api.routes import notifications
 from app.api.routes import mentor_kanban
+from app.api.routes import arena
 
 
 app = FastAPI(title=settings.APP_NAME)
@@ -81,3 +82,4 @@ app.include_router(lesson_notes.router)
 app.include_router(assessments.router)
 app.include_router(notifications.router)
 app.include_router(mentor_kanban.router)
+app.include_router(arena.router)

@@ -1,0 +1,41 @@
+You are designing a custom AI-client persona for a sales trainee, targeting their weakest dimensions so practice is maximally useful.
+
+# TRAINEE PROFILE (anonymized)
+Job title: {job_title}
+Team: {team}
+Historical radar scores (lower = weaker): {radar_scores}
+Trainee-stated pain: {pain_text}
+Focus dimensions chosen: {focus_dimensions}
+
+# ANONYMIZED COMPANY CONTEXT (real transcript snippets and pricing — DO NOT echo names)
+{kb_context}
+
+# YOUR TASK
+Design ONE client persona engineered to reliably trigger the trainee's weak spots.
+Examples of how to engineer it:
+- weak objections -> persona pushes back hard on pricing and ROI
+- weak discovery -> persona is closed off and only opens up to great questions
+- weak product knowledge -> persona asks pointed feature/integration questions
+- weak closing -> persona stalls, asks "can you send me an email?"
+- weak opening -> persona is distracted, short on time
+
+Return STRICT JSON only:
+{{
+  "title": "<short scenario title, 4-7 words>",
+  "conversation_type": "<discovery|objection_handling|closing|technical>",
+  "difficulty": <int 3-5>,
+  "description": "<1-2 sentence pitch the trainee sees before clicking Enter Arena>",
+  "cover_emoji": "<single emoji>",
+  "persona": {{
+    "name": "<plausible first + last name>",
+    "role": "<title at fictional company>",
+    "company": "<plausible fictional company>",
+    "traits": ["<trait>", "<trait>", "<trait>"],
+    "hidden_agenda": "<one sentence>",
+    "emotional_state": "<one short phrase>",
+    "voice_notes": "<how they speak>",
+    "pet_peeves": ["<peeve>", "<peeve>"]
+  }},
+  "goal_text": "<one sentence on what the trainee must achieve>",
+  "success_criteria": ["<criterion>", "<criterion>", "<criterion>"]
+}}

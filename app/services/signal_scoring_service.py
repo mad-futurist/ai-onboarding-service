@@ -58,6 +58,12 @@ def score_topic_friction(
             f"{questions_count} questions related to {topic} in the last {features['window_days']} days."
         )
 
+    if topic in {"price_list", "company_info"} and questions_count >= 2:
+        score += 0.2
+        evidence_lines.append(
+            "This sales-critical topic needs a lower threshold because mistakes can affect live customer conversations."
+        )
+
     if questions_count >= 4:
         score += 0.15
         evidence_lines.append(
@@ -105,6 +111,8 @@ def score_topic_friction(
         "testing": "Possible testing workflow friction",
         "architecture": "Possible architecture understanding gap",
         "jira_workflow": "Possible Jira workflow confusion",
+        "price_list": "Possible price list confusion",
+        "company_info": "Possible company information confusion",
     }
 
     action_by_topic = {
@@ -130,6 +138,14 @@ def score_topic_friction(
         ),
         "jira_workflow": (
             "Explain the team Jira workflow, ticket statuses, sprint rituals, and ownership rules."
+        ),
+        "price_list": (
+            "Review the price list with the newcomer, especially package fit, discount approval rules, "
+            "and how to move from price objections back to value."
+        ),
+        "company_info": (
+            "Run a short company-positioning walkthrough covering ICP, proof points, buyer roles, "
+            "and the one-sentence explanation for prospects."
         ),
     }
 
@@ -163,6 +179,8 @@ def score_all_signals(features: dict[str, Any]) -> list[SignalScoreResult]:
         "testing",
         "architecture",
         "jira_workflow",
+        "price_list",
+        "company_info",
     ]
 
     results: list[SignalScoreResult] = []

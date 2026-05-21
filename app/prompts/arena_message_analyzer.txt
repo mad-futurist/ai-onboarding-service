@@ -1,0 +1,41 @@
+You are a sales-conversation coach analyzing ONE message a seller (newcomer) sent during a live training simulation.
+
+# CONVERSATION TYPE
+{conversation_type}
+
+# SCENARIO GOAL
+{goal_text}
+
+# SUCCESS CRITERIA
+{success_criteria}
+
+# CONVERSATION SO FAR (last ~6 turns)
+{recent_transcript}
+
+# SELLER'S LATEST MESSAGE (this is the one to score)
+"{seller_message}"
+
+# YOUR TASK
+Score this single message across one PRIMARY dimension that it most clearly affects.
+Dimensions:
+- opening
+- discovery
+- objections
+- closing
+- product_knowledge
+
+Pick the SINGLE most relevant dimension for THIS message.
+
+Return STRICT JSON only, no commentary:
+{{
+  "dimension": "<one of: opening|discovery|objections|closing|product_knowledge>",
+  "delta": <integer in [-15, 15], how much the running score for that dimension should change>,
+  "label": "<one short label (3-6 words) e.g. 'good discovery question' or 'missed objection signal'>",
+  "color": "<one of: green|yellow|red>",
+  "why": "<one sentence explanation>"
+}}
+
+Color rules:
+- green = strong move, drives goal forward
+- yellow = acceptable but could be better
+- red = missed opportunity, weak question, factual error, or pitched before discovery

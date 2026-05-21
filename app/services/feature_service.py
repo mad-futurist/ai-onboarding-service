@@ -14,6 +14,8 @@ SIGNAL_TOPICS = [
     "testing",
     "architecture",
     "jira_workflow",
+    "price_list",
+    "company_info",
 ]
 
 TOPIC_ALIASES = {
@@ -27,6 +29,12 @@ TOPIC_ALIASES = {
     "pull_request": "code_review",
     "pr": "code_review",
     "ticket": "jira_workflow",
+    "pricing": "price_list",
+    "price": "price_list",
+    "discount": "price_list",
+    "company": "company_info",
+    "company_profile": "company_info",
+    "positioning": "company_info",
 }
 
 

@@ -33,6 +33,20 @@ SIGNAL_TO_GAP: dict[str, dict] = {
         "description": "Newcomers repeatedly consult the same documents without finding clear answers.",
         "suggested_fix": "Rewrite the most-referenced documents with step-by-step instructions and role-specific examples.",
     },
+    "price_list_friction": {
+        "gap_type": "documentation_gap",
+        "topic": "price_list",
+        "title": "Price list is confusing for sales newcomers",
+        "description": "Newcomers repeatedly ask about package prices, discount rules, budget fit, or quoting guidance.",
+        "suggested_fix": "Turn the price list into a sales-ready quick reference with package fit, objection examples, and approval rules.",
+    },
+    "company_info_friction": {
+        "gap_type": "documentation_gap",
+        "topic": "company_info",
+        "title": "Company positioning is unclear for newcomers",
+        "description": "Newcomers repeatedly ask how to explain the company, ICP, proof points, or buyer-specific value.",
+        "suggested_fix": "Create a one-page positioning guide with ICP, proof points, buyer roles, and talk tracks.",
+    },
     "blocked_task": {
         "gap_type": "process_gap",
         "topic": "task_clarity",

@@ -38,3 +38,9 @@ class NewcomerProfile(Base):
         back_populates="newcomer",
         cascade="all, delete-orphan",
     )
+
+    arena_sessions = relationship(
+        "ArenaSession",
+        back_populates="newcomer",
+        cascade="all, delete-orphan",
+    )

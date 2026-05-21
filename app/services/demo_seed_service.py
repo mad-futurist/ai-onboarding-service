@@ -15,6 +15,7 @@ from app.models.assessment import (
     AssessmentQuestion,
     AssessmentSubmission,
 )
+from app.models.arena import ArenaMessage, ArenaScenario, ArenaSession
 from app.models.blocked_report import BlockedReport
 from app.models.company_onboarding_gap import CompanyOnboardingGap
 from app.models.course import Course
@@ -24,6 +25,7 @@ from app.models.lesson import Lesson
 from app.models.lesson_note import LessonNote
 from app.models.mentor_digest import MentorDigest
 from app.models.newcomer import NewcomerProfile
+from app.models.notification import Notification
 from app.models.onboarding_event import OnboardingEvent
 from app.models.onboarding_plan import OnboardingPlan
 from app.models.onboarding_reflection import OnboardingReflection
@@ -33,9 +35,11 @@ from app.models.plan_adjustment import PlanAdjustmentSuggestion
 from app.models.progress_snapshot import ProgressSnapshot
 from app.models.scheduled_meeting import ScheduledMeeting
 from app.models.sprint import Sprint
+from app.models.task_comment import TaskComment
 from app.models.user import User
 from app.models.week import Week
 from app.services.rag_service import generate_chunks_for_document
+from app.services.topic_classifier import classify_topic
 
 
 SALES_REGULATION = """
@@ -285,6 +289,90 @@ Follow-up:
 """.strip()
 
 
+SALES_PRICE_LIST = """
+Orynt AI Onboarding price list for 2026.
+
+Use these prices when a prospect asks about price, pricing, budget, package,
+license, subscription, cost, fee, quote, invoice, discount, or contract value.
+
+Packages:
+- Starter: USD 1,200 per month. Includes up to 25 newcomers, 3 mentor seats,
+  knowledge-base chat, basic analytics, and email support.
+- Growth: USD 2,800 per month. Includes up to 75 newcomers, 10 mentor seats,
+  Arena role-play, AI signal detection, LMS/course generation, and priority support.
+- Enterprise: starts at USD 6,500 per month. Includes unlimited newcomers,
+  SSO/SAML, custom data retention, dedicated success manager, security review,
+  and quarterly enablement workshops.
+- Pilot: USD 3,000 for 30 days. Includes one sales team, up to 15 newcomers,
+  seed knowledge-base setup, and a final readiness report.
+
+Implementation:
+- Standard onboarding setup: USD 1,500 one-time.
+- Enterprise implementation: USD 5,000 one-time and includes an integrations workshop.
+- Extra mentor seat: USD 120 per month.
+- Extra newcomer pack: USD 400 per month for 10 additional newcomers.
+
+Discount rules:
+- Up to 10% discount may be offered for annual prepayment.
+- Larger discounts require approval from Oleg Bondarenko and Finance.
+- Do not discount before discovery. First quantify the cost of slow ramp,
+  missed follow-ups, and manager time.
+- If a prospect says "too expensive", ask what budget range they planned and
+  compare it with the cost of delayed salesperson productivity.
+
+How to explain value:
+- Starter fits small teams proving the process.
+- Growth is the default recommendation for sales teams because it includes
+  Arena role-play and AI signal detection.
+- Enterprise fits regulated or multi-country teams that need SSO, custom
+  retention, and procurement support.
+""".strip()
+
+
+COMPANY_INFORMATION = """
+Orynt company profile for sales conversations.
+
+Company:
+Orynt.ai builds AI onboarding software for teams that need new employees to
+become productive faster. The demo company sells ReadySet.AI, a platform that
+combines a knowledge base, AI Q&A, mentor dashboards, onboarding plans, courses,
+assessments, and sales Arena simulations.
+
+Positioning:
+- We are not only an LMS. We connect learning content to daily onboarding tasks,
+  mentor decisions, and readiness signals.
+- We are not only a chatbot. Answers are grounded in company documents and can
+  cite sources.
+- We are not only analytics. Signals turn into mentor actions, plan adjustments,
+  and meetings.
+
+Primary ICP:
+- Sales teams hiring BDRs, SDRs, AEs, or account managers.
+- Companies with repeated onboarding pain, inconsistent ramp, messy
+  documentation, or weak manager visibility.
+- Teams where mistakes in pricing, discovery, CRM discipline, or product
+  explanation can cost pipeline.
+
+Proof points to mention:
+- Reduces repeated mentor questions by making company docs searchable.
+- Spots confusion early through AI signals from questions, blockers, repeated
+  sources, and task progress.
+- Gives newcomers realistic Arena practice before live customer conversations.
+- Helps mentors see who is blocked, who is progressing fast, and which docs need cleanup.
+
+Buying committee:
+- Head of Sales cares about ramp time, pipeline quality, and manager leverage.
+- HR/People cares about consistency and experience.
+- RevOps cares about CRM discipline and process adoption.
+- Finance cares about cost of ramp and tool consolidation.
+
+Sales note:
+When a prospect asks "what does your company do?", give the one-sentence
+positioning first, then tailor proof points to their role. If they ask about
+price, use the 2026 price list and avoid inventing a custom quote.
+""".strip()
+
+
 BACKEND_DOCUMENTS = [
     {
         "title": "Company Handbook",
@@ -421,6 +509,24 @@ SALES_DOCUMENTS = [
         "role_target": "sales_manager",
         "scope": "role",
     },
+    {
+        "title": "Orynt 2026 Price List",
+        "content": SALES_PRICE_LIST,
+        "source": "Finance",
+        "document_type": "price_list",
+        "domain": "finance",
+        "role_target": "sales_manager,bdr,account_executive,all",
+        "scope": "enterprise",
+    },
+    {
+        "title": "Orynt Company Information",
+        "content": COMPANY_INFORMATION,
+        "source": "Sales Enablement",
+        "document_type": "company_profile",
+        "domain": "general",
+        "role_target": "sales_manager,bdr,account_executive,all",
+        "scope": "enterprise",
+    },
 ]
 
 
@@ -430,6 +536,13 @@ PEOPLE = [
     {"full_name": "Victor Petrenko", "role": "DevOps Engineer", "team": "Infrastructure", "email": "victor@orynt.demo", "topics": ["deployment", "kubernetes", "staging", "rollback"]},
     {"full_name": "Katia Shevchenko", "role": "Senior AE", "team": "Продажі", "email": "katia@orynt.demo", "topics": ["demo", "pricing", "competitive_intel", "enterprise_deals"]},
     {"full_name": "Ana Kovalenko", "role": "QA Engineer", "team": "Payments", "email": "ana@orynt.demo", "topics": ["testing", "qa", "bug_reporting"]},
+]
+
+
+SALES_PEOPLE = [
+    person
+    for person in PEOPLE
+    if person["email"] in {"oleg@orynt.demo", "natalia@orynt.demo", "katia@orynt.demo"}
 ]
 
 
@@ -525,9 +638,10 @@ def _seed_response(
     }
 
 
-def _create_documents(db: Session) -> list[Document]:
+def _create_documents(db: Session, *, include_backend: bool = True) -> list[Document]:
     docs: list[Document] = []
-    for doc_data in [*SALES_DOCUMENTS, *BACKEND_DOCUMENTS]:
+    source_docs = [*SALES_DOCUMENTS, *BACKEND_DOCUMENTS] if include_backend else SALES_DOCUMENTS
+    for doc_data in source_docs:
         doc = Document(source_type="text", external_url=None, **doc_data)
         db.add(doc)
         docs.append(doc)
@@ -691,6 +805,49 @@ def _create_course(
     return course
 
 
+def _create_sales_arena_bot(
+    db: Session,
+    *,
+    mentor: User,
+    newcomer: NewcomerProfile,
+    docs: list[Document],
+) -> ArenaScenario:
+    scenario = ArenaScenario(
+        mentor_id=mentor.id,
+        audience_newcomer_id=newcomer.id,
+        title="Marina personal bot - pricing objection recovery",
+        conversation_type="objection_handling",
+        difficulty=2,
+        persona={
+            "name": "Iryna D.",
+            "role": "Founder of a warm lead company",
+            "mood": "interested but price-sensitive",
+            "background": "She already likes the product, but compares it with a cheaper agency.",
+        },
+        goal_text=(
+            "Practice moving from a price objection into quantified business value, then agree "
+            "on a concrete next step without discounting too early."
+        ),
+        success_criteria=[
+            "Acknowledge the concern without defending the price.",
+            "Ask one diagnostic question before pitching.",
+            "Connect the offer to the cost of the current problem.",
+            "Close with a specific next step in CRM.",
+        ],
+        kb_source_ids=[doc.id for doc in docs],
+        allow_live_coaching=True,
+        is_personal_bot=True,
+        description=(
+            "Sales-only Arena bot for Marina, generated from the sales playbook, KPI docs, "
+            "CRM discipline and objection-handling sources."
+        ),
+        cover_emoji="AI",
+    )
+    db.add(scenario)
+    db.flush()
+    return scenario
+
+
 def _create_ai_question(
     db: Session,
     *,
@@ -699,6 +856,10 @@ def _create_ai_question(
     answer: str,
     source_doc: Document | None,
 ) -> AIQuestion:
+    topic = classify_topic(f"{question} {answer}")
+    if topic == "unknown" and any(token in f"{question} {answer}".lower() for token in ["crm", "kpi"]):
+        topic = "sales"
+
     ai_question = AIQuestion(
         user_id=newcomer.user_id,
         newcomer_id=newcomer.id,
@@ -715,7 +876,12 @@ def _create_ai_question(
             event_type="ai_question_asked",
             entity_type="ai_question",
             entity_id=ai_question.id,
-            topic="sales" if "CRM" in answer or "KPI" in answer else "deployment",
+            topic=topic,
+            metadata_json={
+                "question": question,
+                "source_titles": [source_doc.title] if source_doc else [],
+                "top_k": 1,
+            },
         )
     )
     chunk = _first_chunk(db, source_doc)
@@ -770,47 +936,395 @@ def _create_assessment(
     return assessment
 
 
+def _delete_demo_data(db: Session) -> None:
+    for model in [
+        Notification,
+        ArenaMessage,
+        ArenaSession,
+        ArenaScenario,
+        AISignalFeedback,
+        AIAnswerFeedback,
+        AIQuestionSource,
+        AssessmentAnswer,
+        AssessmentSubmission,
+        AssessmentQuestion,
+        ScheduledMeeting,
+        BlockedReport,
+        PlanAdjustmentSuggestion,
+        AISignal,
+        ProgressSnapshot,
+        OnboardingReflection,
+        OnboardingEvent,
+        NewcomerRecommendedContact,
+        LessonNote,
+        Lesson,
+        Course,
+        TaskComment,
+        OnboardingTask,
+        Week,
+        Sprint,
+        OnboardingPlan,
+        MentorDigest,
+        CompanyOnboardingGap,
+        Assessment,
+        AIQuestion,
+        AIConversation,
+        DocumentChunk,
+        Document,
+        PersonContact,
+        NewcomerProfile,
+        User,
+    ]:
+        db.query(model).delete(synchronize_session=False)
+
+
 def reset_demo_data(db: Session) -> dict:
     try:
-        for model in [
-            AISignalFeedback,
-            AIAnswerFeedback,
-            AIQuestionSource,
-            AssessmentAnswer,
-            AssessmentSubmission,
-            AssessmentQuestion,
-            ScheduledMeeting,
-            BlockedReport,
-            PlanAdjustmentSuggestion,
-            AISignal,
-            ProgressSnapshot,
-            OnboardingReflection,
-            OnboardingEvent,
-            NewcomerRecommendedContact,
-            LessonNote,
-            Lesson,
-            Course,
-            OnboardingTask,
-            Week,
-            Sprint,
-            OnboardingPlan,
-            MentorDigest,
-            CompanyOnboardingGap,
-            Assessment,
-            AIQuestion,
-            AIConversation,
-            DocumentChunk,
-            Document,
-            PersonContact,
-            NewcomerProfile,
-            User,
-        ]:
-            db.query(model).delete(synchronize_session=False)
+        _delete_demo_data(db)
         db.commit()
         return seed_demo_data(db=db)
     except Exception:
         db.rollback()
         raise
+
+
+def reset_sales_demo_data(db: Session) -> dict:
+    try:
+        _delete_demo_data(db)
+        db.commit()
+        return seed_sales_demo_data(db=db)
+    except Exception:
+        db.rollback()
+        raise
+
+
+def seed_sales_demo_data(db: Session) -> dict:
+    existing_mentor = db.query(User).filter(User.email == "oleg@orynt.demo").first()
+    if existing_mentor:
+        return _seed_response(db, already_seeded=True)
+
+    mentor = User(email="oleg@orynt.demo", full_name="Oleg Bondarenko", role="mentor")
+    marina_user = User(email="marina@orynt.demo", full_name="Marina Kovalenko", role="newcomer")
+    db.add_all([mentor, marina_user])
+    db.flush()
+
+    marina = NewcomerProfile(
+        user_id=marina_user.id,
+        mentor_id=mentor.id,
+        job_title="Sales Manager / BDR",
+        seniority="Junior",
+        team="Sales",
+        start_date=date.today() - timedelta(days=10),
+        onboarding_status="active",
+    )
+    db.add(marina)
+    db.flush()
+
+    for person in SALES_PEOPLE:
+        db.add(PersonContact(**person))
+    db.flush()
+
+    docs = _create_documents(db, include_backend=False)
+
+    marina_plan, marina_tasks = _create_plan(
+        db,
+        newcomer=marina,
+        mentor=mentor,
+        title="Marina Kovalenko - sales onboarding",
+        description=(
+            "30-day sales ramp focused on ICP, outreach, CRM hygiene, KPI reporting, "
+            "discovery calls, proposals and objection handling."
+        ),
+        goal=(
+            "Prepare Marina to handle real cold and warm leads, keep clean CRM updates, "
+            "and practice customer conversations in Arena before live calls."
+        ),
+        tasks=MARINA_TASKS,
+    )
+
+    blocked_task = next(task for task in marina_tasks if task.status == "blocked")
+    role_play_task = next(task for task in marina_tasks if task.task_type == "role_play")
+    db.add(
+        BlockedReport(
+            newcomer_id=marina.id,
+            task_id=blocked_task.id,
+            user_id=marina_user.id,
+            blocker_type="crm_kpi_confusion",
+            details=(
+                "Marina is not yet confident translating Instagram/Facebook conversations "
+                "into clean plan-versus-actual KPI rows."
+            ),
+            ai_suggestion=(
+                "Run a short CRM walkthrough with one lead per channel, then ask Marina "
+                "to update the same KPI tracker without mentor prompts."
+            ),
+            status="open",
+        )
+    )
+
+    crm_signal = AISignal(
+        newcomer_id=marina.id,
+        signal_type="sales_crm_kpi_attention",
+        severity="high",
+        tone="attention",
+        confidence=0.91,
+        score=0.84,
+        title="CRM/KPI discipline needs mentor attention",
+        description=(
+            "Marina completed outreach basics, but the blocked task and repeated KPI questions "
+            "show she needs a concrete sales reporting walkthrough."
+        ),
+        evidence=(
+            "- KPI task is blocked.\n"
+            "- Questions cluster around daily activity tracking.\n"
+            "- CRM examples are needed before scaling outreach volume."
+        ),
+        suggested_action=(
+            "Pair for 15 minutes on clean CRM rows, then apply the pending week-2 plan adjustment."
+        ),
+        status="open",
+        occurrence_count=3,
+        target_task_id=blocked_task.id,
+    )
+    arena_signal = AISignal(
+        newcomer_id=marina.id,
+        signal_type="arena_low_value_framing",
+        severity="medium",
+        tone="attention",
+        confidence=0.87,
+        score=0.73,
+        title="Arena practice should focus on pricing objections",
+        description=(
+            "Marina is ready for sales role-play, but needs a focused Arena bot before live "
+            "price and timing objections."
+        ),
+        evidence=(
+            "- Objection-handling task is still in progress.\n"
+            "- Sales docs emphasize value framing before discounting.\n"
+            "- Mentor can review Arena performance before assigning live calls."
+        ),
+        suggested_action=(
+            "Use the Marina personal bot, then convert the debrief into one next sales task."
+        ),
+        status="open",
+        occurrence_count=2,
+        target_task_id=role_play_task.id,
+    )
+    db.add_all([crm_signal, arena_signal])
+    db.flush()
+
+    db.add(
+        PlanAdjustmentSuggestion(
+            newcomer_id=marina.id,
+            plan_id=marina_plan.id,
+            signal_id=crm_signal.id,
+            title="Tighten Marina week 2 around CRM, KPI and sales role-play",
+            reason=(
+                "The sales-only reset keeps the demo centered on Marina's pipeline readiness: "
+                "clean CRM rows, value-framed objections, and confident discovery next steps."
+            ),
+            suggested_changes=[
+                {
+                    "action": "add_task",
+                    "title": "CRM walkthrough with one lead per channel",
+                    "description": "Turn one Instagram, Facebook and Email lead into clean KPI tracker rows.",
+                    "task_type": "crm",
+                    "week_number": 2,
+                    "day_number": 2,
+                    "priority": "high",
+                    "success_criteria": "Marina updates all KPI rows without mentor corrections.",
+                },
+                {
+                    "action": "add_task",
+                    "title": "Arena pricing objection role-play",
+                    "description": "Complete the personal bot scenario and capture one improved response.",
+                    "task_type": "arena",
+                    "week_number": 2,
+                    "day_number": 3,
+                    "priority": "high",
+                    "success_criteria": "Marina frames value before discussing price or timing.",
+                },
+            ],
+            status="pending",
+            target_scope="week",
+        )
+    )
+
+    db.add(
+        ProgressSnapshot(
+            newcomer_id=marina.id,
+            week_number=2,
+            completed_tasks=3,
+            blocked_tasks=1,
+            open_signals=2,
+            progress_percent=38,
+            strengths=["ICP basics", "cold outreach drafts", "discovery preparation"],
+            gaps=["CRM hygiene", "plan/fact KPI reporting", "price objection framing"],
+            mentor_notes="Sales-only demo: keep Marina on CRM proof, objection practice and Arena coaching.",
+        )
+    )
+
+    questions_created = 0
+    price_doc = _find_doc(docs, "Price List")
+    company_doc = _find_doc(docs, "Company Information")
+    question_payloads = [
+        (
+            "What is the daily outreach target for a sales manager?",
+            "Daily plan: Freelancehunt 20, Instagram 30, Facebook 40, Email 20, LinkedIn 10, Telegram 5; 125 contacts total.",
+            docs[3] if len(docs) > 3 else docs[0],
+        ),
+        (
+            "How should I respond when a lead says the offer is too expensive?",
+            "Acknowledge the concern, ask a diagnostic question, then connect the offer to the business cost of the current problem before discussing discounting.",
+            docs[-2] if len(docs) > 1 else docs[0],
+        ),
+        (
+            "What belongs in a discovery call brief?",
+            "Capture the customer's goals, current state, budget, problem, decision process and concrete next step.",
+            docs[0],
+        ),
+        (
+            "What price should I quote for a sales team that needs Arena?",
+            "Use Growth as the default recommendation for sales teams: USD 2,800 per month, including Arena role-play, AI signal detection, course generation and priority support.",
+            price_doc or docs[-2],
+        ),
+        (
+            "Can I discount the price if the lead says it is too expensive?",
+            "Do not discount before discovery. Annual prepayment can receive up to 10%; larger discounts require approval from Oleg Bondarenko and Finance.",
+            price_doc or docs[-2],
+        ),
+        (
+            "What does Orynt do in one sentence?",
+            "Orynt.ai builds AI onboarding software that combines company knowledge, plans, courses, assessments, mentor dashboards, AI signals and Arena simulations to help teams ramp faster.",
+            company_doc or docs[-1],
+        ),
+        (
+            "Which company proof points should I mention to a Head of Sales?",
+            "Lead with faster ramp, better pipeline quality, manager leverage, realistic Arena practice before live calls, and early detection of confusion or blockers.",
+            company_doc or docs[-1],
+        ),
+    ]
+    for question, answer, source_doc in question_payloads:
+        _create_ai_question(
+            db,
+            newcomer=marina,
+            question=question,
+            answer=answer,
+            source_doc=source_doc,
+        )
+        questions_created += 1
+
+    course = _create_course(
+        db,
+        newcomer=marina,
+        mentor=mentor,
+        plan=marina_plan,
+        title="First sales wins for Marina",
+        summary="A focused sales course covering outreach, CRM discipline, KPI reporting, objection handling and Arena practice.",
+        role_target="sales_manager",
+        source_docs=docs,
+        lessons=[
+            {
+                "title": "Convert outreach activity into clean CRM proof",
+                "summary": "Move from raw channel activity to plan/fact KPI rows Oleg can trust.",
+                "body": (
+                    "Start with the KPI channel, then record each meaningful dialogue with source, "
+                    "status, next step and blocker. Separate activity KPIs from outcome KPIs."
+                ),
+                "takeaways": [
+                    "Track channel activity every day.",
+                    "Every warm lead needs one next step.",
+                    "CRM proof should be reviewable without extra explanation.",
+                ],
+            },
+            {
+                "title": "Practice pricing objections in Arena",
+                "summary": "Use the personal bot to rehearse price and timing objections before live outreach.",
+                "body": (
+                    "Do not discount after the first objection. Acknowledge the concern, ask one "
+                    "diagnostic question, then reframe around the cost of the current business problem."
+                ),
+                "video_url": "https://www.youtube.com/watch?v=X7oxXhfwv40",
+                "takeaways": [
+                    "Acknowledge before reframing.",
+                    "Ask before pitching.",
+                    "Close with a concrete next step.",
+                ],
+            },
+        ],
+    )
+
+    _create_sales_arena_bot(db, mentor=mentor, newcomer=marina, docs=docs)
+
+    now = datetime.now(timezone.utc)
+    meetings = [
+        ScheduledMeeting(
+            newcomer_id=marina.id,
+            organizer_user_id=mentor.id,
+            plan_id=marina_plan.id,
+            task_id=blocked_task.id,
+            signal_id=crm_signal.id,
+            title="Sales CRM unblock",
+            agenda="Turn three real leads into clean plan/fact KPI rows and confirm the reporting habit.",
+            starts_at=now + timedelta(days=1, hours=2),
+            ends_at=now + timedelta(days=1, hours=2, minutes=30),
+            attendee_emails=[mentor.email, marina_user.email],
+            teams_join_url="https://teams.microsoft.com/l/demo-marina-crm",
+            status="confirmed",
+        ),
+        ScheduledMeeting(
+            newcomer_id=marina.id,
+            organizer_user_id=mentor.id,
+            plan_id=marina_plan.id,
+            task_id=role_play_task.id,
+            signal_id=arena_signal.id,
+            title="Arena debrief: pricing objection",
+            agenda="Review Marina's personal bot practice and turn the debrief into one concrete sales task.",
+            starts_at=now + timedelta(days=3, hours=1),
+            ends_at=now + timedelta(days=3, hours=1, minutes=45),
+            attendee_emails=[mentor.email, marina_user.email, "katia@orynt.demo"],
+            teams_join_url="https://teams.microsoft.com/l/demo-marina-arena",
+            status="proposed",
+        ),
+    ]
+    db.add_all(meetings)
+
+    db.add(
+        MentorDigest(
+            mentor_id=mentor.id,
+            week_start=date.today() - timedelta(days=date.today().weekday()),
+            week_end=date.today() - timedelta(days=date.today().weekday()) + timedelta(days=6),
+            summary=(
+                "Sales-only reset: Marina is progressing on outreach, but needs mentor focus on CRM/KPI proof "
+                "and Arena practice for pricing objections."
+            ),
+            highlights=[
+                "Marina completed ICP basics and first outreach drafts.",
+                "The course and Arena bot are ready for sales-specific coaching.",
+            ],
+            risks=[
+                "CRM/KPI reporting is still blocked.",
+                "Pricing objection framing needs practice before live calls.",
+            ],
+            recommended_actions=[
+                "Run the sales CRM unblock meeting.",
+                "Ask Marina to complete the personal Arena bot before the next outreach block.",
+            ],
+        )
+    )
+
+    db.commit()
+
+    return _seed_response(
+        db,
+        documents_created=len(docs),
+        courses_created=1 if course else 0,
+        tasks_created=len(marina_tasks),
+        questions_created=questions_created,
+        meetings_created=len(meetings),
+        signals_created=2,
+        blocked_reports_created=1,
+    )
 
 
 def seed_demo_data(db: Session) -> dict:

@@ -26,8 +26,8 @@ from app.services.llm_service import generate_answer
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
 
-_ALLOWED_DOMAINS = ["engineering", "hr", "product", "finance", "security", "general"]
-_ALLOWED_TYPES = ["guide", "handbook", "policy", "runbook", "checklist", "reference"]
+_ALLOWED_DOMAINS = ["engineering", "hr", "product", "finance", "security", "sales", "general"]
+_ALLOWED_TYPES = ["guide", "handbook", "policy", "runbook", "checklist", "reference", "price_list", "company_profile"]
 _ALLOWED_SOURCE_TYPES = ["text", "url", "github", "file"]
 
 

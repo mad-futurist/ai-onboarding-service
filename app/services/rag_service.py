@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import httpx
 from openai import OpenAI
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -26,6 +26,92 @@ class RetrievedChunk:
     chunk: DocumentChunk
     distance: float
     similarity: float
+
+
+PRICE_QUERY_KEYWORDS = [
+    "price",
+    "pricing",
+    "cost",
+    "fee",
+    "budget",
+    "package",
+    "subscription",
+    "license",
+    "discount",
+    "quote",
+    "invoice",
+]
+
+COMPANY_INFO_QUERY_KEYWORDS = [
+    "company",
+    "about us",
+    "what do we do",
+    "what does orynt",
+    "what does readyset",
+    "positioning",
+    "icp",
+    "proof point",
+    "proof points",
+    "buying committee",
+]
+
+
+def _contains_any(value: str, keywords: list[str]) -> bool:
+    normalized = value.lower()
+    return any(keyword in normalized for keyword in keywords)
+
+
+def _keyword_boosted_chunks(
+    db: Session,
+    question: str,
+    existing_chunk_ids: set[int],
+    limit: int,
+) -> list[RetrievedChunk]:
+    if limit <= 0:
+        return []
+
+    filters = []
+    if _contains_any(question, PRICE_QUERY_KEYWORDS):
+        filters.append(
+            or_(
+                func.lower(Document.title).like("%price%"),
+                func.lower(Document.title).like("%pricing%"),
+                func.lower(Document.document_type).like("%price%"),
+                func.lower(Document.content).like("%discount%"),
+                func.lower(Document.content).like("%usd%"),
+            )
+        )
+    if _contains_any(question, COMPANY_INFO_QUERY_KEYWORDS):
+        filters.append(
+            or_(
+                func.lower(Document.title).like("%company%"),
+                func.lower(Document.title).like("%profile%"),
+                func.lower(Document.document_type).like("%company%"),
+                func.lower(Document.content).like("%positioning%"),
+                func.lower(Document.content).like("%buying committee%"),
+            )
+        )
+
+    if not filters:
+        return []
+
+    rows = (
+        db.query(DocumentChunk)
+        .join(Document, Document.id == DocumentChunk.document_id)
+        .filter(or_(*filters))
+        .order_by(Document.id.desc(), DocumentChunk.chunk_index.asc())
+        .limit(limit)
+        .all()
+    )
+
+    boosted: list[RetrievedChunk] = []
+    for chunk in rows:
+        if chunk.id in existing_chunk_ids:
+            continue
+        existing_chunk_ids.add(chunk.id)
+        boosted.append(RetrievedChunk(chunk=chunk, distance=0.0, similarity=1.0))
+
+    return boosted
 
 
 def generate_chunks_for_document(
@@ -85,10 +171,12 @@ def retrieve_relevant_chunks(
     )
 
     results: list[RetrievedChunk] = []
+    seen_chunk_ids: set[int] = set()
 
     for chunk, distance in rows:
         similarity = 1 - float(distance)
 
+        seen_chunk_ids.add(chunk.id)
         results.append(
             RetrievedChunk(
                 chunk=chunk,
@@ -97,7 +185,14 @@ def retrieve_relevant_chunks(
             )
         )
 
-    return results
+    boosted = _keyword_boosted_chunks(
+        db=db,
+        question=question,
+        existing_chunk_ids=seen_chunk_ids,
+        limit=top_k,
+    )
+
+    return [*boosted, *results][:top_k]
 
 
 def build_context_from_chunks(retrieved_chunks: list[RetrievedChunk]) -> str:
@@ -146,6 +241,9 @@ Your job:
 - mention when the sources are insufficient;
 - do not invent company rules, links, people, or procedures;
 - include a short "Sources used" section at the end with document titles.
+- for price, pricing, package, fee, cost, budget, quote, invoice, or discount questions,
+  prioritize exact package names, numbers, currency, billing period, and approval rules from the price list;
+- for company information questions, prioritize positioning, ICP, proof points, and buyer-role context from company docs.
 
 If the answer is not in the sources, say that the available documents do not contain enough information.
 """

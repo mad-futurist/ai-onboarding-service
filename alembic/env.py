@@ -56,6 +56,7 @@ from app.models.assessment import (
 )
 from app.models.task_comment import TaskComment
 from app.models.notification import Notification
+from app.models.arena import ArenaScenario, ArenaSession, ArenaMessage
 
 target_metadata = Base.metadata
 # other values from the config, defined by the needs of env.py,
