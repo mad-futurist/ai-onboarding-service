@@ -848,6 +848,48 @@ def _create_sales_arena_bot(
     return scenario
 
 
+def _create_sales_cfo_scenario(
+    db: Session,
+    *,
+    mentor: User,
+    docs: list[Document],
+) -> ArenaScenario:
+    scenario = ArenaScenario(
+        mentor_id=mentor.id,
+        audience_newcomer_id=None,
+        title="Skeptical CFO",
+        conversation_type="discovery",
+        difficulty=1,
+        persona={
+            "name": "Robert Lin",
+            "role": "CFO",
+            "company": "Northridge Logistics",
+            "traits": ["skeptical", "data-driven", "short on time"],
+            "hidden_agenda": (
+                "Has been burned by a prior vendor and needs political cover "
+                "to approve another contract."
+            ),
+            "emotional_state": "guarded",
+            "voice_notes": "Short sentences. Interrupts when buzzwords appear.",
+            "pet_peeves": ["vague promises", "vendor jargon"],
+        },
+        goal_text="Earn a 30-minute follow-up call where pricing is on the table.",
+        success_criteria=[
+            "Discover at least 2 concrete pains",
+            "Name one quantifiable success metric",
+            "Secure a follow-up date",
+        ],
+        kb_source_ids=[doc.id for doc in docs],
+        allow_live_coaching=True,
+        is_personal_bot=False,
+        description="Senior finance buyer who tests every ROI claim.",
+        cover_emoji="\U0001F3AF",
+    )
+    db.add(scenario)
+    db.flush()
+    return scenario
+
+
 def _create_ai_question(
     db: Session,
     *,
@@ -1254,6 +1296,7 @@ def seed_sales_demo_data(db: Session) -> dict:
         ],
     )
 
+    _create_sales_cfo_scenario(db, mentor=mentor, docs=docs)
     _create_sales_arena_bot(db, mentor=mentor, newcomer=marina, docs=docs)
 
     now = datetime.now(timezone.utc)

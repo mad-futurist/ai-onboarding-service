@@ -21,6 +21,7 @@ from app.schemas.ai_plan_partial import (
 )
 
 from app.models.document import Document
+from app.models.blocked_report import BlockedReport
 from app.schemas.ai_plan import AIPlanGenerationRequest, AIPlanGenerationResponse
 from app.services.ai_plan_service import generate_onboarding_plan_with_ai
 from app.services.ai_plan_partial_service import (
@@ -323,7 +324,20 @@ def regenerate_plan(
         plan.status = "draft"
 
         # Wipe existing tasks (consistent with full-regen intent).
-        db.query(OnboardingTask).filter(OnboardingTask.plan_id == plan.id).delete()
+        existing_task_ids = [
+            tid for (tid,) in db.query(OnboardingTask.id)
+            .filter(OnboardingTask.plan_id == plan.id)
+            .all()
+        ]
+        if existing_task_ids:
+            # Detach blocked_reports referencing these tasks (FK has no ON DELETE).
+            db.query(BlockedReport).filter(
+                BlockedReport.task_id.in_(existing_task_ids)
+            ).update({BlockedReport.task_id: None}, synchronize_session=False)
+            db.flush()
+        db.query(OnboardingTask).filter(OnboardingTask.plan_id == plan.id).delete(
+            synchronize_session=False
+        )
         db.flush()
 
         new_task_ids: list[int] = []
